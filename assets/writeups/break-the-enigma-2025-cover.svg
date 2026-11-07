@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">BreakTheEnigma CTF 2025 cover</title>
+  <desc id="desc">An original dark cover with cyan abstract cipher rings for BreakTheEnigma CTF 2025.</desc>
+  <rect width="1600" height="900" fill="#080c10"/>
+  <g fill="none" stroke="#35d0ba"><circle cx="1216" cy="386" r="212" opacity=".15"/><circle cx="1216" cy="386" r="140" opacity=".28"/><circle cx="1216" cy="386" r="68" opacity=".5"/><path d="M1216 134v504M964 386h504" opacity=".22"/></g>
+  <rect x="92" y="96" width="1416" height="708" rx="12" fill="#0f171d" stroke="#26363d"/>
+  <text x="150" y="190" fill="#35d0ba" font-family="JetBrains Mono, monospace" font-size="28" font-weight="700" letter-spacing="5">CTF WRITE-UPS / 2025</text>
+  <text x="150" y="372" fill="#e9f1f2" font-family="JetBrains Mono, monospace" font-size="86" font-weight="700" letter-spacing="-6">BREAK THE</text>
+  <text x="150" y="476" fill="#35d0ba" font-family="JetBrains Mono, monospace" font-size="104" font-weight="700" letter-spacing="-7">ENIGMA</text>
+  <text x="158" y="562" fill="#9baeb3" font-family="Inter, sans-serif" font-size="38">Challenge notes · methods · lessons learned</text>
+  <text x="150" y="724" fill="#35d0ba" font-family="JetBrains Mono, monospace" font-size="32" font-weight="700">2025</text>
+  <text x="1390" y="724" fill="#35d0ba" font-family="JetBrains Mono, monospace" font-size="32" font-weight="700">02</text>
+</svg>
