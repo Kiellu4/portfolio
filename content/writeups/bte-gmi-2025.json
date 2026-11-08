@@ -6,6 +6,592 @@
   "members": "",
   "note": "Published after the competition ended.",
   "cover": "assets/writeups/break-the-enigma-2025-cover.svg",
-  "tags": ["Obfuscator", "Hashing", "Hybrid", "Symmetric Encryption"],
-  "categories": []
+  "tags": [
+    "Obfuscator",
+    "Hashing",
+    "Hybrid",
+    "Symmetric Encryption"
+  ],
+  "categories": [
+    {
+      "name": "Obfuscator",
+      "slug": "obfuscator",
+      "challenges": [
+        {
+          "title": "Curse Program",
+          "category": "Obfuscator",
+          "points": "50",
+          "solver": "Kiellu4",
+          "overview": "The challenge supplied an obfuscated JavaScript file that did not resemble normal source code. The goal was to recover the value hidden by the program and submit it using the BTE format.",
+          "analysis": "I began with Cipher Identifier because the file was clearly not ordinary JavaScript. It identified JSFuck; an initial decode only produced alert 0, so I moved to a dedicated decoder for the complete program.",
+          "steps": [
+            {
+              "title": "Inspect the attachment",
+              "text": [
+                "The Curse Program page provides the JavaScript attachment and states that it has been cursed. I used the file itself as the starting evidence instead of executing an unknown program locally.",
+                "That made identifying the obfuscation style the first practical step."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/bte/curse-program-1.webp",
+                  "alt": "Curse Program challenge page with its JavaScript attachment",
+                  "caption": "The challenge supplies the heavily obfuscated JavaScript file."
+                }
+              ]
+            },
+            {
+              "title": "Identify JSFuck",
+              "text": [
+                "I pasted the content into Cipher Identifier. Its result identified JSFuck, explaining why the program is built from unusual JavaScript punctuation rather than readable statements.",
+                "This narrowed the solve to an appropriate decoder instead of trying unrelated classical ciphers."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/bte/curse-program-2.webp",
+                  "alt": "Cipher Identifier used with the Curse Program input",
+                  "caption": "The initial analysis begins by identifying the unusual source."
+                },
+                {
+                  "src": "assets/writeups/bte/curse-program-3.webp",
+                  "alt": "Cipher Identifier result identifying JSFuck",
+                  "caption": "The identifier reports JSFuck as the obfuscation language."
+                }
+              ]
+            },
+            {
+              "title": "Decode the complete program",
+              "text": [
+                "Because the first result was not the final value, I used Wanna Decode JSFUCK with the complete pasted program. The decoder revealed the text needed for the BTE submission.",
+                "Using a decoder also avoided running the untrusted attachment just to inspect its output."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/bte/curse-program-4.webp",
+                  "alt": "Wanna Decode JSFUCK with the Curse Program content",
+                  "caption": "The full program is passed to a dedicated JSFuck decoder."
+                }
+              ]
+            }
+          ],
+          "result": "Decoding the JSFuck source recovered the text used in the final submission.",
+          "flag": "BTE{wH@t_Th3_h@aCK_1s_Th1Ss??}",
+          "tools": "Cipher Identifier, Wanna Decode JSFUCK",
+          "learned": "Recognising an obfuscation language is more useful than guessing at its result. A dedicated decoder can inspect an unfamiliar script without executing it."
+        },
+        {
+          "title": "Garam dan Madu",
+          "category": "Obfuscator",
+          "points": "50",
+          "solver": "Kiellu4",
+          "overview": "The supplied script.py produced a key binary, flag binary, and ciphertext. The task was to decode the binary representations, use the supplied key, and reconstruct the required flag.",
+          "analysis": "I ran the script first and noticed every field was expressed as binary. After converting them, the ciphertext still differed from the other values; because a key was provided, XOR was a better fit than Vigenere.",
+          "steps": [
+            {
+              "title": "Run the supplied script",
+              "text": [
+                "I opened the challenge and ran script.py to see which material it exposes. Its output clearly separates key binary, flag binary, and ciphertext.",
+                "The named key indicated that it would be required by the final operation."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/bte/garam-dan-madu-1.webp",
+                  "alt": "Garam dan Madu challenge page",
+                  "caption": "The challenge provides the Python script used to expose the encoded values."
+                },
+                {
+                  "src": "assets/writeups/bte/garam-dan-madu-2.webp",
+                  "alt": "Garam dan Madu script output",
+                  "caption": "Running the script reveals the data that must be decoded."
+                }
+              ]
+            },
+            {
+              "title": "Decode each binary value",
+              "text": [
+                "I copied key_binary, flag_binary, and ciphertext into CyberChef and used Binary decoding on each one. Normalising all three inputs was necessary before selecting a cipher operation.",
+                "The ciphertext did not look like the ordinary decoded fragments, which confirmed that another transformation remained."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/bte/garam-dan-madu-3.webp",
+                  "alt": "CyberChef decoding the key binary",
+                  "caption": "The key is converted from binary before it is reused."
+                },
+                {
+                  "src": "assets/writeups/bte/garam-dan-madu-4.webp",
+                  "alt": "CyberChef decoding the flag binary",
+                  "caption": "The flag binary is decoded independently."
+                },
+                {
+                  "src": "assets/writeups/bte/garam-dan-madu-5.webp",
+                  "alt": "CyberChef decoding the ciphertext binary",
+                  "caption": "The ciphertext is also converted out of binary."
+                }
+              ]
+            },
+            {
+              "title": "Apply XOR with the recovered key",
+              "text": [
+                "I ruled out Vigenere because the input was not alphabetic text and applied CyberChef XOR with the decoded key. This produced the remaining text, which I combined with the decoded flag portion.",
+                "The resulting string matches the value required by the BTE flag format."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/bte/garam-dan-madu-6.webp",
+                  "alt": "CyberChef XOR recipe for Garam dan Madu",
+                  "caption": "The decoded key is supplied to the XOR operation."
+                },
+                {
+                  "src": "assets/writeups/bte/garam-dan-madu-7.webp",
+                  "alt": "Recovered Garam dan Madu text",
+                  "caption": "The result provides the final recovered text."
+                }
+              ]
+            }
+          ],
+          "result": "Binary decoding followed by keyed XOR recovered the challenge value.",
+          "flag": "BTE{$4k!t_d4D4kU_kuMul41_m3r1Ndv}",
+          "tools": "Python, CyberChef Binary, CyberChef XOR",
+          "learned": "Always normalise an encoded representation before choosing a cipher. A supplied key is a strong clue, but the operation must match the data type."
+        }
+      ]
+    },
+    {
+      "name": "Hashing",
+      "slug": "hashing",
+      "challenges": [
+        {
+          "title": "TRSB 4: Garam MadDelima",
+          "category": "Hashing",
+          "points": "50",
+          "solver": "Kiellu4",
+          "overview": "The script.py challenge asks for a salt at the Masukkan salt prompt and contains an obfuscated salt plus salt_key. The objective is to recover the right salt and let the script reveal its flag value.",
+          "analysis": "I ran the script to see the missing input. The obfuscated salt is accompanied by a key, so I tested XOR; the shown salt_key is decimal 42, which had to be represented appropriately for the operation.",
+          "steps": [
+            {
+              "title": "Inspect the salt prompt",
+              "text": [
+                "I ran the supplied script and confirmed it waits for a salt. This kept the work focused on the obf_salt and salt_key values rather than guessing arbitrary passwords.",
+                "The source material makes the intended relationship between the two values clear."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/bte/garam-maddelima-1.webp",
+                  "alt": "TRSB 4 Garam MadDelima challenge page",
+                  "caption": "The challenge provides script.py and asks for a recovered salt."
+                },
+                {
+                  "src": "assets/writeups/bte/garam-maddelima-2.webp",
+                  "alt": "Source guidance for Garam MadDelima",
+                  "caption": "The source analysis highlights the obfuscated salt and key."
+                },
+                {
+                  "src": "assets/writeups/bte/garam-maddelima-6.webp",
+                  "alt": "Garam MadDelima source code showing obfuscated arrays and key 42",
+                  "caption": "The supplied script shows the obfuscated salt and flag arrays, both using key 42."
+                }
+              ]
+            },
+            {
+              "title": "Test XOR and convert the key",
+              "text": [
+                "Cipher Identifier offered several candidates for the obfuscated value, but the provided key made XOR the relevant one. I then converted decimal 42 into hexadecimal 2a and used the repeated form 2A2A2A as the XOR key.",
+                "Converting the decimal value was necessary because the XOR tool works on the byte representation."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/bte/garam-maddelima-3.webp",
+                  "alt": "Cipher Identifier showing XOR as a candidate",
+                  "caption": "The provided key makes XOR the relevant hypothesis."
+                },
+                {
+                  "src": "assets/writeups/bte/garam-maddelima-4.webp",
+                  "alt": "Number converter showing 42 as hexadecimal 2a",
+                  "caption": "The key is converted before the XOR operation."
+                }
+              ]
+            },
+            {
+              "title": "Recover MadDelima and rerun the script",
+              "text": [
+                "The XOR operation with 2A2A2A revealed MadDelima. I reran script.py and entered that exact salt at the prompt.",
+                "The program returned 1sampai10, which becomes the required BTE-formatted submission."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/bte/garam-maddelima-5.webp",
+                  "alt": "CyberChef XOR result revealing MadDelima",
+                  "caption": "The XOR result provides the salt for the final script run."
+                },
+                {
+                  "src": "assets/writeups/bte/garam-maddelima-7.webp",
+                  "alt": "Garam MadDelima script output after entering MadDelima",
+                  "caption": "After entering the recovered salt, the script reports success and prints 1sampai10."
+                }
+              ]
+            }
+          ],
+          "result": "Entering the recovered salt made the supplied script print the final value.",
+          "flag": "BTE{1sampai10}",
+          "tools": "Python, Cipher Identifier, number-base converter, CyberChef XOR",
+          "learned": "A decimal key may need a base conversion before a byte-oriented operation. Running a supplied script early identifies the one value that actually needs recovery."
+        },
+        {
+          "title": "Password1",
+          "category": "Hashing",
+          "points": "50",
+          "solver": "Kiellu4",
+          "overview": "The challenge presented a login service and a password hash. The task was to identify the hash type, recover its plaintext, and authenticate to retrieve the flag.",
+          "analysis": "The value has 64 hexadecimal characters, which strongly suggested SHA-256. I therefore used a SHA-256 lookup workflow instead of treating the hash as reversible encryption.",
+          "steps": [
+            {
+              "title": "Inspect the login materials",
+              "text": [
+                "I started from the challenge page and the credential clue. The context is a login service, so the hash must be validated by submitting a recovered password rather than simply decoding text.",
+                "The observed 64-character hexadecimal shape provided the main identification clue."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/bte/password1-1.webp",
+                  "alt": "Password1 challenge page",
+                  "caption": "The page establishes the login and password-recovery task."
+                },
+                {
+                  "src": "assets/writeups/bte/password1-2.webp",
+                  "alt": "Credential text containing the supplied hash",
+                  "caption": "The supplied credential material contains the value to identify."
+                }
+              ]
+            },
+            {
+              "title": "Look up the SHA-256 hash",
+              "text": [
+                "I treated the 64-character hexadecimal value as SHA-256 and used a SHA-256 hash lookup tool. It recovered the plaintext Enigma.",
+                "This fits hashing workflow: the original is found or verified, not decrypted as a cipher would be."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/bte/password1-3.webp",
+                  "alt": "SHA-256 lookup output for Password1",
+                  "caption": "The hash lookup identifies Enigma as the password."
+                }
+              ]
+            },
+            {
+              "title": "Authenticate with the recovered password",
+              "text": [
+                "I replaced the password with Enigma in the login service. The successful login response displayed the BTE flag.",
+                "This final check confirms that both the hash type and plaintext were correct."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/bte/password1-4.webp",
+                  "alt": "Password1 login service showing successful Enigma authentication and the flag",
+                  "caption": "The service accepts Enigma for user Chyper and returns the flag."
+                }
+              ]
+            }
+          ],
+          "result": "The recovered password authenticated successfully and returned the flag.",
+          "flag": "BTE{l0G1n_SuCc3sSfu11}",
+          "tools": "SHA-256 hash lookup tool",
+          "learned": "Hash length and alphabet are useful first indicators of its likely algorithm. Always validate a recovered password in the intended application flow."
+        }
+      ]
+    },
+    {
+      "name": "Hybrid",
+      "slug": "hybrid",
+      "challenges": [
+        {
+          "title": "Surat Cinta",
+          "category": "Hybrid",
+          "points": "50",
+          "solver": "Kiellu4",
+          "overview": "Surat_cinta.txt contains an encoded message. The objective was to identify the encoding layers and keep decoding until the BTE-formatted value was exposed.",
+          "analysis": "Cipher Identifier recognised Base64. I decoded one layer, inspected the result, and saw that another encoded line remained, so I repeated the same operation.",
+          "steps": [
+            {
+              "title": "Identify the attachment as Base64",
+              "text": [
+                "I opened the challenge and sent the Surat_cinta.txt content to Cipher Identifier. It recognised Base64, providing a justified first operation.",
+                "The encoded character pattern and tool result\u2014not the challenge title\u2014determined the starting point."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/bte/surat-cinta-1.webp",
+                  "alt": "Surat Cinta challenge page",
+                  "caption": "The page provides Surat_cinta.txt for analysis."
+                },
+                {
+                  "src": "assets/writeups/bte/surat-cinta-2.webp",
+                  "alt": "Cipher Identifier recognising Base64",
+                  "caption": "The identifier confirms the first decoding layer."
+                }
+              ]
+            },
+            {
+              "title": "Decode the first layer",
+              "text": [
+                "I used CyberChef From Base64 on the supplied content. The result still contained an encoded-looking line, so stopping after a readable transformation would have been premature.",
+                "I retained the intermediate output for a second pass."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/bte/surat-cinta-3.webp",
+                  "alt": "CyberChef From Base64 for Surat Cinta",
+                  "caption": "The first decode exposes another encoded value."
+                }
+              ]
+            },
+            {
+              "title": "Decode the remaining layer",
+              "text": [
+                "I applied From Base64 again to the remaining line. The second decode revealed the complete value in the expected BTE format.",
+                "No extra cipher was required after that result."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/bte/surat-cinta-4.webp",
+                  "alt": "CyberChef output after two Base64 decodes",
+                  "caption": "The second Base64 pass reveals the final flag."
+                }
+              ]
+            }
+          ],
+          "result": "Two Base64 decodes recovered the flag from Surat_cinta.txt.",
+          "flag": "BTE{$35UnGgUhnY4_kU_c1nt4_p@d@Mu}",
+          "tools": "Cipher Identifier, CyberChef From Base64",
+          "learned": "Encodings can be layered. Inspect each intermediate result instead of assuming that the first successful operation is the end of the chain."
+        },
+        {
+          "title": "Hantu",
+          "category": "Hybrid",
+          "points": "450",
+          "solver": "Kiellu4",
+          "overview": "The flag.txt input was protected by three layers. Its hint says passwords can have more than one meaning, and the visible password hantudanbaken supplies two semantic clues for the chained solve.",
+          "analysis": "The reference to three encryption types led me to begin with Vigenere. Hantu means ghost, which pointed to GOST for the second step; baken then pointed to Bacon cipher for the final step.",
+          "steps": [
+            {
+              "title": "Read the three-layer hint",
+              "text": [
+                "I opened flag.txt in CyberChef and read the hint before changing the data. It explicitly says three encryption types are required and says that passwords can have more than one meaning.",
+                "I split hantudanbaken into hantu and baken rather than treating it as one literal key."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/bte/hantu-1.webp",
+                  "alt": "Hantu challenge page",
+                  "caption": "The challenge presents the multi-layer flag.txt task."
+                },
+                {
+                  "src": "assets/writeups/bte/hantu-2.webp",
+                  "alt": "Hantu hint about three layers and password meanings",
+                  "caption": "The hint establishes both the number of layers and the split clue."
+                }
+              ]
+            },
+            {
+              "title": "Decode with Vigenere and GOST",
+              "text": [
+                "I used Vigenere Decode first because the description referred to a password. The output was still encoded, so I used the ghost meaning of hantu to search for GOST and appended GOST Decrypt.",
+                "The second result was still not final, which agreed with the three-layer instruction."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/bte/hantu-3.webp",
+                  "alt": "CyberChef Vigenere Decode for Hantu",
+                  "caption": "Vigenere Decode is used for the first layer."
+                },
+                {
+                  "src": "assets/writeups/bte/hantu-4.webp",
+                  "alt": "CyberChef GOST Decrypt for Hantu",
+                  "caption": "GOST is selected from the ghost clue for the second layer."
+                }
+              ]
+            },
+            {
+              "title": "Finish with Bacon Decode and correct the typo",
+              "text": [
+                "The baken part led me to Bacon Cipher Decode. It produced ROTIIALAMAKLIMAHBIADAP, which was close but not accepted.",
+                "The hint says to fix the typo, so I changed the extra I to J in the known phrase and submitted ROTIJALAMAKLIMAHBIADAP."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/bte/hantu-5.webp",
+                  "alt": "CyberChef Bacon Decode result for Hantu",
+                  "caption": "Bacon Decode produces the near-final phrase; the hint explains the final correction."
+                }
+              ]
+            }
+          ],
+          "result": "The Vigenere, GOST, and Bacon sequence produced a typo-marked phrase that the final hint corrected.",
+          "flag": "BTE{ROTIJALAMAKLIMAHBIADAP}",
+          "tools": "CyberChef Vigenere Decode, GOST Decrypt, Bacon Cipher Decode",
+          "learned": "Titles and passwords can be semantic cipher clues rather than only literal keys. Preserve intermediate results and revisit the hint whenever a plausible value fails submission."
+        }
+      ]
+    },
+    {
+      "name": "Symmetric Encryption",
+      "slug": "symmetric-encryption",
+      "challenges": [
+        {
+          "title": "TRSB 1: Memutar Info",
+          "category": "Symmetric Encryption",
+          "points": "200",
+          "solver": "Kiellu4",
+          "overview": "The challenge gave ciphertext t9c9s_evmv_c8mvn_wjh8o8s8 and a clue connected to 25. The task was to choose the correct rotation settings and recover the flag text.",
+          "analysis": "The hint suggested ROT25. The first output had the right words but wrong digits, showing that letter rotation alone was insufficient and that the number option mattered.",
+          "steps": [
+            {
+              "title": "Start with ROT25",
+              "text": [
+                "I entered the ciphertext into CyberChef and used ROT with an amount of 25, following the challenge clue. The first output was structured and nearly readable, which confirmed the rotation choice.",
+                "However, its digits still did not match the intended phrase."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/bte/memutar-info-1.webp",
+                  "alt": "TRSB 1 Memutar Info challenge page",
+                  "caption": "The page supplies the ciphertext and its clue related to 25."
+                },
+                {
+                  "src": "assets/writeups/bte/memutar-info-2.webp",
+                  "alt": "CyberChef ROT with amount 25 before digit rotation",
+                  "caption": "The near-readable output shows that a setting is still missing."
+                }
+              ]
+            },
+            {
+              "title": "Enable digit rotation",
+              "text": [
+                "The first result was s9b9r_dulu_b8lum_vig8n8r8. Because the ciphertext includes digits, I enabled Rotate numbers while keeping the rotation amount at 25.",
+                "This changed the output to s4b4r_dulu_b3lum_vig3n3r3, the value required by the flag format."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/bte/memutar-info-3.webp",
+                  "alt": "CyberChef ROT with Rotate numbers enabled",
+                  "caption": "Enabling digit rotation yields the final readable result."
+                }
+              ]
+            }
+          ],
+          "result": "ROT25 with number rotation enabled recovered the intended plaintext.",
+          "flag": "BTE{s4b4r_dulu_b3lum_vig3n3r3}",
+          "tools": "CyberChef ROT",
+          "learned": "ROT tools can treat letters and digits separately. A near-readable output is a signal to check options before abandoning the cipher hypothesis."
+        },
+        {
+          "title": "TRSB 2: Nota Tersembunyi",
+          "category": "Symmetric Encryption",
+          "points": "50",
+          "solver": "Kiellu4",
+          "overview": "The challenge supplied nota.txt with encrypted content and the readable clue kelisajahat. The objective was to identify the cipher and apply the relevant key to obtain the final plaintext.",
+          "analysis": "Cipher Identifier returned multiple possibilities. I selected Vigenere because it fit the text and because kelisajahat remained as a meaningful untransformed string that could act as a key.",
+          "steps": [
+            {
+              "title": "Identify a candidate cipher",
+              "text": [
+                "I copied the note into Cipher Identifier. Rather than trying every reported result, I compared the candidates with the readable clue included by the challenge.",
+                "Vigenere was the most useful candidate because the clue looked like a passphrase."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/bte/nota-tersembunyi-1.webp",
+                  "alt": "TRSB 2 Nota Tersembunyi challenge page",
+                  "caption": "The challenge provides nota.txt and the kelisajahat clue."
+                },
+                {
+                  "src": "assets/writeups/bte/nota-tersembunyi-2.webp",
+                  "alt": "Cipher Identifier results for the encrypted note",
+                  "caption": "The tool provides candidate ciphers for the note."
+                }
+              ]
+            },
+            {
+              "title": "Decode with kelisajahat",
+              "text": [
+                "I used CyberChef Vigenere Decode and set kelisajahat as the key. I chose it because it was the visible text that was not itself encrypted.",
+                "The result produced the readable message used in the BTE submission."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/bte/nota-tersembunyi-3.webp",
+                  "alt": "CyberChef Vigenere Decode output using kelisajahat",
+                  "caption": "The provided word is used as the Vigenere key to reveal the flag text."
+                }
+              ]
+            }
+          ],
+          "result": "Vigenere Decode with the clue as key recovered the flag text.",
+          "flag": "BTE{kalau_kau_senyap_mr_xor_bagi_kau_dua_juta}",
+          "tools": "Cipher Identifier, CyberChef Vigenere Decode",
+          "learned": "A readable word placed beside ciphertext may be an intended key. Use challenge context to narrow a broad list of identifier candidates."
+        },
+        {
+          "title": "Kereta Api",
+          "category": "Symmetric Encryption",
+          "points": "400",
+          "solver": "Kiellu4",
+          "overview": "The challenge hides a clue in an image and its description includes the number 8. Selectively viewing the image revealed KU3LR43LT_41_P4; the task was to identify the matching cipher and key.",
+          "analysis": "After other suggestions failed, I used the title's train meaning to look for a train-related cipher. Rail Fence fit the theme, but the initial output was wrong until I used 8 from the description as its key.",
+          "steps": [
+            {
+              "title": "Reveal and transcribe the visual clue",
+              "text": [
+                "I covered the right side of the screen and noticed that the left side contained the capital letters and digits. I transcribed them as KU3LR43LT_41_P4.",
+                "I also checked the picture with exiftool, but it had no useful metadata, so the visible clue remained the intended input."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/bte/kereta-api-1.webp",
+                  "alt": "Kereta Api challenge page",
+                  "caption": "The challenge introduces the image-based clue."
+                },
+                {
+                  "src": "assets/writeups/bte/kereta-api-2.webp",
+                  "alt": "Kereta Api image containing the visual clue",
+                  "caption": "The image produces the ciphertext after selective viewing."
+                }
+              ]
+            },
+            {
+              "title": "Use the train theme to select Rail Fence",
+              "text": [
+                "Kereta Api translates to train, so I searched for train-related ciphers and selected Rail Fence Cipher Decode. I entered the transcribed text into the Rail Fence recipe.",
+                "The first output was not correct, so the cipher choice needed a parameter adjustment rather than replacement."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/bte/kereta-api-3.webp",
+                  "alt": "CyberChef Rail Fence Cipher Decode initial attempt",
+                  "caption": "The train-themed Rail Fence cipher is tested against the transcribed clue."
+                }
+              ]
+            },
+            {
+              "title": "Set the key to 8",
+              "text": [
+                "I revisited the description and noticed the number 8. I set the Rail Fence key to 8 and reran the decode.",
+                "The output became K3R3T4_4P1_L4LU, which I wrapped in the BTE format."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/bte/kereta-api-4.webp",
+                  "alt": "CyberChef Rail Fence Cipher Decode with key 8",
+                  "caption": "The key value 8 produces the final readable output."
+                }
+              ]
+            }
+          ],
+          "result": "The visual clue, Rail Fence cipher, and key 8 recovered the final value.",
+          "flag": "BTE{K3R3T4_4P1_L4LU}",
+          "tools": "Visual inspection, exiftool, CyberChef Rail Fence Cipher Decode",
+          "learned": "Visual challenges may hide their useful data in plain sight, not metadata. When a themed cipher nearly fits, revisit the description for its key parameter."
+        }
+      ]
+    }
+  ]
 }
