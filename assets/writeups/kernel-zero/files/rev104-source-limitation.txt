@@ -1,0 +1,9 @@
+rev104 source limitation
+========================
+
+The supplied KERNELØ-CTF 2025 write-up contains only a result screenshot and
+the final flag for Rev104. It does not preserve the challenge binary, commands,
+decompiler output, exploit/solve script, or an explanation of the method.
+
+No solve script has been recreated because doing so would require inventing a
+method that is not supported by the original source.
