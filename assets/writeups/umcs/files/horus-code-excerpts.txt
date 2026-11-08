@@ -1,0 +1,6 @@
+# HORUS
+# Code and command excerpts from the UMCS UM 2026 write-up.
+
+## Validate the inner key (python)
+key = bytes.fromhex('deadbeefcafebabe')
+assert hashlib.md5(key).hexdigest() == 'c1a708f3e14e36e388ec2f75d04ceff2'

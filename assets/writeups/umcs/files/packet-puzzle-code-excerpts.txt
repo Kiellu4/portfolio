@@ -1,0 +1,15 @@
+# Packet_Puzzle
+# Code and command excerpts from the UMCS UM 2026 write-up.
+
+## Isolate the signal traffic (wireshark filter)
+tcp.dstport == 4444 || tcp.dstport == 4445 || tcp.dstport == 4446
+
+## Join and decode payloads (python)
+combined = b''.join(b''.join(payloads[p]) for p in [4444, 4445, 4446])
+raw = bytearray(base64.b64decode(combined))
+
+## Repair the PNG structure (python)
+raw[0:8] = b'\x89PNG\r\n\x1a\n'
+raw[12:16] = b'IHDR'
+raw[raw.rfind(b'IENU'):raw.rfind(b'IENU') + 4] = b'IEND'
+# recompute each chunk CRC before writing fixed.png

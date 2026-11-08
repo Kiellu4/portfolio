@@ -1,0 +1,5 @@
+# Metamon 2
+# Code and command excerpts from the UMCS UM 2026 write-up.
+
+## Inspect Edge history (sql)
+SELECT last_visit_time, title, url FROM urls;

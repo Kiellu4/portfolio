@@ -1,0 +1,8 @@
+# Guess The Pin
+# Code and command excerpts from the UMCS UM 2026 write-up.
+
+## Trigger the debugger and inspect the file filter (text)
+/report?student=....//app.py
+
+## Unlock the console and read the flag (text)
+113-197-073

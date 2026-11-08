@@ -1,0 +1,25 @@
+# The Hexed Protocol
+# Code and command excerpts from the UMCS UM 2026 write-up.
+
+## Convert the hexadecimal dump and identify its format (bash)
+cat vault_dump.txt | xxd -r -p > vault.bin
+file vault.bin
+
+## Build a password-policy wordlist (python)
+values = ["Synergy", "Disruption", "Pivot", "Agility", "Paradigm"]
+specials = "!@#$%^&*()-_=+[{]};:'\",<.>/?~`|"
+
+with open("passlist.txt", "w") as f:
+    for value in values:
+        for pin in range(10000):
+            for special in specials:
+                f.write(f"{value}{pin:04d}{special}\n")
+
+## Extract and crack the KeePass hash (bash)
+keepass2john vault.bin > vault.hash
+john --wordlist=passlist.txt vault.hash
+
+## Open the vault and read the stored note (bash)
+kpcli --kdb vault.bin
+cd Root/
+show -f 0

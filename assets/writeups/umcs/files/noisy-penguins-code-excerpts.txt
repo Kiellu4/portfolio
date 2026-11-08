@@ -1,0 +1,12 @@
+# Noisy_Penguins
+# Code and command excerpts from the UMCS UM 2026 write-up.
+
+## Identify the oversized Matroska container (bash)
+file Noisy_Penguins.mkv
+ffprobe Noisy_Penguins.mkv
+
+## Extract the attached video (bash)
+ffmpeg -dump_attachment:t:0 PINGU.mp4 -i Noisy_Penguins.mkv -f null -
+
+## Repair the noisy third fragment (text)
+UMCS{as + sc11_p3nG + u1n_n00t}

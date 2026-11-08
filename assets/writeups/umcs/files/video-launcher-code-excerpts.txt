@@ -1,0 +1,15 @@
+# Video Launcher
+# Code and command excerpts from the UMCS UM 2026 write-up.
+
+## Identify the SFX dropper (text)
+Setup=chilllll.mp4
+Setup=WinSystemUpdate.exe
+TempMode
+Silent=1
+Overwrite=1
+
+## Extract the nested PyInstaller payload (bash)
+7z x VideoLauncher.exe -osfx_out
+cd sfx_out
+python3 pyinstxtractor.py WinSystemUpdate.exe
+find WinSystemUpdate.exe_extracted -iname '*keylog*'

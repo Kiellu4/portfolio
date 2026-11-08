@@ -1,0 +1,8 @@
+# Metamon 7
+# Code and command excerpts from the UMCS UM 2026 write-up.
+
+## Locate and hash the three artifacts (bash)
+H1=$(sha256sum "$RIZZLER" | awk '{print $1}')
+H2=$(sha256sum "$PROFILE" | awk '{print $1}')
+H3=$(sha256sum "$DITTO" | awk '{print $1}')
+echo "UMCS{$H1, $H2, $H3}"

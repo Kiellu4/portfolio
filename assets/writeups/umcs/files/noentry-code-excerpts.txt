@@ -1,0 +1,12 @@
+# NoEntry
+# Code and command excerpts from the UMCS UM 2026 write-up.
+
+## Mount the VMDK read-only (bash)
+guestfish --ro -a "NoEntry-disk1.vmdk" -i
+
+## Traverse to the administrator Desktop and read the flag (text)
+ls /
+ls /Users
+ls /Users/Administrator
+ls /Users/Administrator/Desktop
+cat /Users/Administrator/Desktop/flag.txt

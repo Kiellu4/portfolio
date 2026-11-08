@@ -1,0 +1,13 @@
+# Makmal Buta, UM
+# Code and command excerpts from the UMCS UM 2026 write-up.
+
+## Recover the MT19937 state (python)
+ids = [int(x, 16) for x in re.findall(r'ID: (0x[0-9a-fA-F]{8})', data)]
+state = [untemper(value) for value in ids[:624]]
+rng = MT19937Clone(state)
+
+## XOR predicted values with the encrypted tail (python)
+out = []
+for encrypted in ids[624:]:
+    out.append(chr(encrypted ^ rng.getrandbits32()))
+print(''.join(out))

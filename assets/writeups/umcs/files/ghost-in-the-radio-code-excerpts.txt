@@ -1,0 +1,13 @@
+# Ghost in the Radio
+# Code and command excerpts from the UMCS UM 2026 write-up.
+
+## Use the PNG header as known plaintext (python)
+k0 = ciphertext[0] ^ 0x89
+k1 = ciphertext[1] ^ 0x50
+drift = (k1 - k0) % 256
+
+## Decrypt every byte and write the image (python)
+plaintext = bytearray()
+for i, value in enumerate(ciphertext):
+    plaintext.append(value ^ ((k0 + i * drift) % 256))
+open('recovered_flag.png', 'wb').write(plaintext)

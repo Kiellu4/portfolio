@@ -1,0 +1,11 @@
+{
+  "output": "bte-gmi-2025.html",
+  "event": "BTE CTF GMI 2025",
+  "result": "2nd Runner-Up",
+  "team": "Solo: Kiellu4",
+  "members": "",
+  "note": "Published after the competition ended.",
+  "cover": "assets/writeups/break-the-enigma-2025-cover.svg",
+  "tags": ["Obfuscator", "Hashing", "Hybrid", "Symmetric Encryption"],
+  "categories": []
+}

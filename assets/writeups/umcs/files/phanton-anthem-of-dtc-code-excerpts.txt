@@ -1,0 +1,9 @@
+# Phanton Anthem of DTC
+# Code and command excerpts from the UMCS UM 2026 write-up.
+
+## Inspect and subtract the stereo channels (bash)
+soxi DTC_Midnight.wav
+
+## Inspect and subtract the stereo channels (python)
+samples = np.frombuffer(raw, dtype='<i2').reshape(-1, 2)
+hidden = (samples[:, 0] - samples[:, 1]).astype('<i2')

@@ -1,0 +1,22 @@
+# Varsity Lake Sonata
+# Code and command excerpts from the UMCS UM 2026 write-up.
+
+## Unpack UPX and find the comparison logic (bash)
+upx -d Varsity_Lake_Sonata.bin -o unpacked.bin
+
+## Unpack UPX and find the comparison logic (c)
+state = 0x13;
+for (i = 0; i < 36; i++) {
+    value = (input[i] ^ 0x4d) ^ i ^ state;
+    if (value != target[i]) return 0;
+    state = input[i];
+}
+
+## Reverse the chained XOR (python)
+state = 0x13
+flag = ""
+for i, value in enumerate(target):
+    ch = value ^ i ^ state ^ 0x4d
+    flag += chr(ch)
+    state = ch
+print(flag)

@@ -1,0 +1,12 @@
+{
+  "output": "nexsec-mcmc-2026.html",
+  "event": "NEXSEC CTF MCMC 2026",
+  "result": "1st preliminary · advanced to final",
+  "team": "Team: tuneX",
+  "members": "Ha1qal, Kiellu4, Ni5h",
+  "note_label": "Rules",
+  "note": "Humanoid category - no AI; only basic DeepSeek AI (no DeepThink) allowed elsewhere.",
+  "cover": "assets/writeups/nexsec-mcmc-2026-cover.svg",
+  "tags": ["Pwn", "Rev", "Web", "Forensic", "Crypto", "Misc"],
+  "categories": []
+}

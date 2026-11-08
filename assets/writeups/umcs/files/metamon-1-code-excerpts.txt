@@ -1,0 +1,5 @@
+# Metamon 1
+# Code and command excerpts from the UMCS UM 2026 write-up.
+
+## Read the creation command (text)
+VU1DU3szel9mMXJzN19nbGFmXzR0X3I0bnNvbV9uMFQzfQ==

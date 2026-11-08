@@ -1,0 +1,5 @@
+# Metamon 6
+# Code and command excerpts from the UMCS UM 2026 write-up.
+
+## Extract the archive (bash)
+7z x LOCKED.7z -p'GcJqVl9YaVwBIPC4nbOW' -ounlocked

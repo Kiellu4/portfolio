@@ -56,9 +56,11 @@ const viewableImageSelector = [
   '.cert-grid img',
   '.writeup-card > img',
   '.writeup-hero img',
-  '.writeup-figure img'
+  '.writeup-figure',
+  '.writeup-figure img',
+  '.challenge-body figure img'
 ].join(', ');
-const viewableImages = [...document.querySelectorAll(viewableImageSelector)];
+const viewableImages = [...new Set(document.querySelectorAll(viewableImageSelector))];
 
 if (viewableImages.length) {
   const lightbox = document.createElement('div');
@@ -126,7 +128,6 @@ if (viewableImages.length) {
     image.setAttribute('role', 'button');
     image.setAttribute('aria-haspopup', 'dialog');
     image.setAttribute('aria-label', `View full image: ${image.alt || 'image'}`);
-    image.addEventListener('click', () => openLightbox(image));
     image.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
@@ -138,7 +139,16 @@ if (viewableImages.length) {
     image.addEventListener('focus', removeHoverPreview);
   });
 
+  document.addEventListener('click', (event) => {
+    const image = event.target.closest(
+      '.writeup-figure img, .challenge-body figure img, .writeup-hero img, img.writeup-figure'
+    );
+    if (!image || lightbox.contains(image)) return;
+    openLightbox(image);
+  });
+
   closeButton.addEventListener('click', closeLightbox);
+  lightboxImage.addEventListener('click', closeLightbox);
   lightbox.addEventListener('click', (event) => {
     if (event.target === lightbox) closeLightbox();
   });
