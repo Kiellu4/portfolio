@@ -31,16 +31,29 @@ def site_nav() -> str:
 
 
 def challenge_card(item: dict) -> str:
+    if item.get("title_only"):
+        return f'''          <details class="challenge-card">
+            <summary><span><strong>{e(item["title"])}</strong></span><span aria-hidden="true">+</span></summary>
+          </details>'''
     meta = " · ".join(e(value) for value in (item.get("category"), item.get("points"), item.get("difficulty")) if value)
     solver = e(item["solver"])
     step_markup = []
     for step in item.get("steps", []):
         paragraphs = "\n".join(f"                <p>{e(paragraph)}</p>" for paragraph in step.get("text", []))
+        tables = "\n".join(
+            "                <div class=\"table-wrap\"><table><thead><tr>"
+            + "".join(f"<th>{e(cell)}</th>" for cell in table.get("headers", []))
+            + "</tr></thead><tbody>"
+            + "".join("<tr>" + "".join(f"<td>{e(cell)}</td>" for cell in row) + "</tr>" for row in table.get("rows", []))
+            + "</tbody></table></div>"
+            for table in step.get("tables", [])
+        )
         code = "\n".join(f'                <p class="code-language">{e(block.get("lang", "text"))}</p>\n                <pre><code>{e(block["text"])}</code></pre>' for block in step.get("code", []))
         images = "\n".join(f'                <figure><img class="writeup-figure" src="../{e(pic["src"])}" alt="{e(pic["alt"])}" loading="lazy"><figcaption>{e(pic["caption"])}</figcaption></figure>' for pic in step.get("images", []))
         files = "\n".join(f'                <a class="file-download" href="../{e(file["path"])}" download>{e(file["label"])}<span>{e(file.get("size", ""))}</span></a>' for file in step.get("files", []))
         step_markup.append(f'''              <li class="solve-step"><h4>{e(step["title"])}</h4>
 {paragraphs}
+{tables}
 {code}
 {images}
 {files}

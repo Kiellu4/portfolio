@@ -1,0 +1,571 @@
+Crypto
+
+Paradise
+
+
+
+
+File: chall.py
+Host: koala.nexsec.my Port: 39876
+Link deepseek: https://chat.deepseek.com/share/06x3n3lw18xjpe6yng
+
+   1.​ Recon
+The provided chall.py:
+ from random import *
+ from Crypto.Cipher import AES
+ from hashlib import sha256
+ import secrets
+
+ something = []
+ standart = 624*32
+
+ seed = randbytes(8)
+ rng = Random(seed)
+
+ # hmm
+ secret = rng.getrandbits(32)
+
+
+
+                                                                    70
+ for _ in range(standart//20 - 32):
+    x = rng.getrandbits(32)
+    something.append(x >> 16)
+
+ print("-"*128)
+ print("I think I've given you enough data to figure out the secret. Let's see if you can get it right
+ hehe")
+ print("-"*128)
+ print(something)
+
+ for _ in range(3):
+    print("You only have 3 chances to guess the correct answer")
+    ans_seed = (input("Seed (hex): ").strip())
+    ans_scrt = int(input("Secret: ").strip())
+
+   if ans_seed == seed.hex() and ans_scrt == secret:
+       with open("flag.txt", "r") as f:
+          flag = f.read().strip()
+
+      print(flag)
+      exit()
+   else:
+      print("Try again, please be careful")
+
+ print("I'm quite disappointed that you couldn't guess it correctly")
+
+
+Key facts:
+               Item                                                  Value
+
+ Seed                                  8 bytes (randbytes(8))
+
+ RNG                                   CPython random.Random (MT19937)
+
+ Secret                                first getrandbits(32) call, i.e. output #0
+
+ Leaked                                966 values, each = top 16 bits of outputs #1 … #966
+
+ Attempts                              3 (irrelevant once we can compute the seed locally)
+The server prints the leak list on connect, then asks for Seed (hex) and Secret. Note the secret
+is before the leaked outputs — so naive "predict the next output" fails. We must recover the
+seed.
+
+     2.​ The Math
+Let s_0, s_1, …, s_623 be the MT state right after seeding. Let w_n denote the n-th word of the
+first block, w_n = s_{n-1} for n ≥ 1 (1-based indexing; output #n is temper(w_n) for n = 1..624).
+
+Define F(x) = x >> 16 (top 16 bits).
+
+
+                                                                                                    71
+Step1 - first-block outputs
+For n = 1..343:
+ F(temper(w_n)) = leaked[n-1]
+Tempering (y ^= y>>11, y ^= (y<<7)&…, y ^= (y<<15)&…, y ^= y>>18) is linear over GF(2). So
+each of the 16 top output bits is a GF(2) linear form in the 32 bits of w_n. That's 16 equations
+per word.
+
+Step 2 - MT recurrence
+The raw state satisfies the classical MT recurrence
+ x_{k+624} = x_{k+397} ^ twist_term(x_k, x_{k+1})
+where twist_term(a,b) = ((upper(a) | lower(b)) >> 1) ^ (MAG if b&1 else 0) and MAG =
+0x9908B0DF.
+Tempering is linear, so applying it to both sides:
+ out_{k+624} = out_{k+397} ^ temper(twist_term(x_k, x_{k+1}))
+Rearranged:
+ F(temper(twist_term(x_k, x_{k+1}))) = F(out_{k+624}) ^ F(out_{k+397})
+                      = leaked[623+k] ^ leaked[396+k]
+for k = 0..342 (so the last needed output is #966, present). That's another 16 GF(2) equations
+per k.
+The w_0 subtlety
+For k = 0, twist_term(w_0, w_1) uses only w_0's bit 31 and w_1's bits 0..30. So w_0 contributes
+exactly 1 unknown bit. Let me add it as a single extra variable.
+
+   3.​ Untwist — recovering the state after init_by_array
+The GF(2) solve gives us w_1..w_343 (first-block words = post-init_by_array state words
+s_0..s_342). We want s_229..s_343 (needed to invert the seeding passes).
+Use the twist relation in reverse. For i = 228..343:
+ t = w_i ^ w_{i-227}
+ if (t >> 31) & 1:
+     t ^= MAG; low = 1
+ else:
+     low = 0
+ y = ((t << 1) | low) & 0xFFFFFFFF
+ s[i] |= (y >> 31) & 1 << 31    # top bit
+ s[i+1] = y & 0x7FFFFFFF           # low 31 bits
+Overlapping contributions build up s[i] bit 31 from step i and bits 0..30 from step i-1, giving
+complete words for s[229..343]. (s[343]'s top bit depends on w_0 top bit only indirectly; the
+2-combo loop handles it.)
+
+
+
+
+                                                                                                  72
+   4.​ Inverting init_by_array — recovering the 18-word key
+The seeding key is 18 words:
+ key = seed (8 bytes) || sha512(seed) (64 bytes) → 72 bytes = 18 × 32-bit words
+init_by_array runs two passes over the state:
+Pass 1 (k = 0..623, i = 1..623 wrapping, j = k mod 18):
+ mt[i] = (mt[i] ^ ((mt[i-1] ^ (mt[i-1]>>30)) * 1664525)) + key[j] + j
+Pass 2 (k = 0..622, i = 1..623, no key use):
+ mt[i] = (mt[i] ^ ((mt[i-1] ^ (mt[i-1]>>30)) * 1566083941)) - i
+Then mt[0] = 0x80000000.
+Inverting pass 2 (i = 230..343)
+For i ≥ 2, the value read as mt[i-1] at step i is the already-updated (post-pass-2) value — which
+is our recovered s[i-1]. So:
+ mt1[i] = ((s[i] + i) & 0xFFFFFFFF) ^ ((s[i-1] ^ (s[i-1]>>30)) * 1566083941)
+where mt1[i] is the state after pass 1 (pre-pass-2).
+Inverting pass 1 (i = 231..343)
+For i ≥ 2, the mt[i-1] read at step i is the post-pass-1 value = mt1[i-1], and mt[i] on the RHS is the
+original init_genrand(19650218)[i] value (call it MT0[i]):
+ key[j] = (mt1[i] - j - (MT0[i] ^ ((mt1[i-1] ^ (mt1[i-1]>>30)) * 1664525))) & 0xFFFFFFFF
+with j = (i-1) mod 18. Each j appears multiple times across i = 231..343 — a consistency check
+catches any mistake. Require all 18 slots filled.
+Reconstructing the seed
+key[0] is the lowest word. Form:
+ key_int = Σ_{i=0}^{17} key[i] << (32*i)
+ blob = key_int.to_bytes(72, "big")
+ seed = blob[:8]
+ tail = blob[8:]
+ assert sha512(seed).digest() == tail
+Then secret = Random(seed).getrandbits(32).
+
+    5.​ Implementation notes
+GF(2) linear solve — XOR-basis
+For ~11000 equations over ~11000 unknowns, dense Gaussian elimination is O(n³) ≈ 10¹² — too
+slow. Instead use an XOR basis keyed by lowest set bit:
+ basis = {}
+ for r, c in zip(rows, rhs):
+    while r:
+        piv = (r & -r).bit_length() - 1
+        if piv in basis:
+            br, bc = basis[piv]; r ^= br; c ^= bc
+        else:
+            basis[piv] = (r, c); break
+
+
+                                                                                                   73
+   else:
+      if c: inconsistent
+Insertion is O(n²/64) and back-substitution from highest pivot down recovers the particular
+solution. Free variables emerge naturally as the indices not present as pivots.
+Fast verification
+Before running the forward init_by_array and sha512 check, verify_s(s, key) re-runs
+forward_init_by_array(key) and compares against the recovered s[230..343]. This catches bad
+key recoveries immediately without touching Random(seed).
+Index convention (the pitfall that cost the most time)
+leaked[n] (0-based) is the leak of output #(n+1), i.e. word w_{n+1}. Step B uses target =
+leaked[623+k] ^ leaked[396+k] with k = 0..342; combined with 1-based w, this is internally
+consistent, and the untwist must use w_i = W[i-1].
+
+    6.​ Solver
+Full script (solve.py):
+ ┌──(crypto_env)(kiel㉿Kiel)-[/path/to/Paradise]
+ └─$ cat solve.py
+ #!/usr/bin/env python3
+ import argparse, re, socket, hashlib
+ from random import Random
+
+ N = 624
+ M = 397
+ MAG = 0x9908B0DF
+ M32 = 0xFFFFFFFF
+
+ DEFAULT_HOST = "koala.nexsec.my"
+ DEFAULT_PORT = 39031
+
+ NW = 343 # w_1..w_343 -> W[0..342]
+
+ def parse_leaked_from_text(text):
+    m = re.search(r"(\[[0-9,\s]+\])", text)
+    if not m:
+        return None
+    return [int(x) for x in m.group(1).replace("\n", " ").replace("[", "").replace("]", "").split(",") if
+ x.strip()]
+
+ # ---------------------------------------------------------------------------
+ # Symbolic words: w_n for n = 0..343. n=0 -> only bit 31 lives at var 0.
+ # n>=1 -> bits at var 1 + (n-1)*32 + b.
+ # ---------------------------------------------------------------------------
+ def sym_w(n):
+    if n == 0:
+        w = [0] * 32
+        w[31] = 1
+        return w
+
+
+
+                                                                                                            74
+  base = 1 + (n - 1) * 32
+  return [1 << (base + b) for b in range(32)]
+
+def temper_sym(w):
+  def xr(w, s):
+     o = list(w)
+     for b in range(32):
+        if b + s < 32:
+            o[b] = w[b] ^ w[b + s]
+     return o
+  def xl(w, s, mask):
+     o = list(w)
+     for b in range(32):
+        src = b - s
+        if src >= 0 and ((mask >> b) & 1):
+            o[b] = w[b] ^ w[src]
+        else:
+            o[b] = w[b]
+     return o
+  y = xr(w, 11)
+  y = xl(y, 7, 0x9D2C5680)
+  y = xl(y, 15, 0xEFC60000)
+  y = xr(y, 18)
+  return y
+
+def twist_term_sym(wk, wk1):
+  y = [0] * 32
+  y[31] = wk[31]
+  for b in range(31):
+     y[b] = wk1[b]
+  sh = [0] * 32
+  for b in range(31):
+     sh[b] = y[b + 1]
+  low = y[0]
+  out = [0] * 32
+  for b in range(32):
+     v = sh[b]
+     if (MAG >> b) & 1:
+         v ^= low
+     out[b] = v
+  return out
+
+def build_system(leaked):
+  nvars = 1 + NW * 32 # 10977
+  rows, rhs = [], []
+  # Step A: n = 1..NW (first-block word w_n, output n-1)
+  for n in range(1, NW + 1):
+     t = temper_sym(sym_w(n))
+     for b in range(16):
+        rows.append(t[16 + b])
+
+
+                                                           75
+        rhs.append((leaked[n - 1] >> b) & 1)
+  # Step B: k = 0..NW-1 (recurrence)
+  for k in range(NW):
+     L = twist_term_sym(sym_w(k), sym_w(k + 1))
+     t = temper_sym(L)
+     target = leaked[623 + k] ^ leaked[396 + k]
+     for b in range(16):
+        rows.append(t[16 + b])
+        rhs.append((target >> b) & 1)
+  return rows, rhs, nvars
+
+def xor_basis_solve(rows, rhs, nvars):
+  basis = {}
+  for r, c in zip(rows, rhs):
+     c &= 1
+     while r:
+         piv = (r & -r).bit_length() - 1
+         if piv in basis:
+             br, bc = basis[piv]
+             r ^= br
+             c ^= bc
+         else:
+             basis[piv] = (r, c)
+             break
+     else:
+         if c:
+             return None
+  solution = 0
+  for piv in sorted(basis.keys(), reverse=True):
+     r, c = basis[piv]
+     val = c
+     rest = r ^ (1 << piv)
+     while rest:
+         j = (rest & -rest).bit_length() - 1
+         if (solution >> j) & 1:
+             val ^= 1
+         rest ^= (1 << j)
+     if val:
+         solution |= (1 << piv)
+  free_vars = [v for v in range(nvars) if v not in basis]
+  return solution, free_vars
+
+def init_genrand(seed):
+  mt = [0] * N
+  mt[0] = seed
+  for i in range(1, N):
+      mt[i] = (1812433253 * (mt[i - 1] ^ (mt[i - 1] >> 30)) + i) & M32
+  return mt
+
+def forward_init_by_array(key_words):
+
+
+                                                                         76
+  KL = len(key_words)
+  mt = init_genrand(19650218)
+  C1, C2 = 1664525, 1566083941
+  i, j = 1, 0
+  for _ in range(max(N, KL)):
+      mt[i] = ((mt[i] ^ ((mt[i-1] ^ (mt[i-1] >> 30)) * C1)) + key_words[j] + j) & M32
+      i += 1; j += 1
+      if i >= N:
+          mt[0] = mt[N-1]; i = 1
+      if j >= KL:
+          j=0
+  for _ in range(N - 1):
+      mt[i] = ((mt[i] ^ ((mt[i-1] ^ (mt[i-1] >> 30)) * C2)) - i) & M32
+      i += 1
+      if i >= N:
+          mt[0] = mt[N-1]; i = 1
+  mt[0] = 0x80000000
+  return mt
+
+def untwist(w0_top_bit, W):
+  """W is list of 343 words = w_1..w_343 (0-based W[j] = w_{j+1}).
+  w0_top_bit is w_0 bit 31 (only bit 31 of w_0 known).
+  Returns dict s[i] for i = 229..344."""
+  w = [0] * (NW + 2)
+  w[0] = (w0_top_bit & 1) << 31
+  for i in range(1, NW + 1):
+     w[i] = W[i - 1]
+  s = {}
+  for i in range(228, NW + 1):
+     t = (w[i] ^ w[i - 227]) & M32
+     if (t >> 31) & 1:
+         t ^= MAG
+         low = 1
+     else:
+         low = 0
+     y = ((t << 1) | low) & M32
+     top = ((y >> 31) & 1) << 31
+     low31 = y & 0x7FFFFFFF
+     s[i] = (s.get(i, 0) | top)
+     s[i + 1] = low31
+  return s
+
+def recover_key_18(s):
+  KL = 18
+  MT0 = init_genrand(19650218)
+  C2 = 1566083941
+  C1 = 1664525
+  mt1 = {}
+  for i in range(230, 344):
+     if i not in s or (i - 1) not in s:
+
+
+                                                                                        77
+          continue
+      prev = s[i - 1]
+      term = ((prev ^ (prev >> 30)) * C2) & M32
+      mt1[i] = ((s[i] + i) & M32) ^ term
+  key = {}
+  for i in range(231, 344):
+      if i not in mt1 or (i - 1) not in mt1:
+          continue
+      j = (i - 1) % KL
+      prev = mt1[i - 1]
+      h = ((prev ^ (prev >> 30)) * C1) & M32
+      val = (mt1[i] - j - (MT0[i] ^ h)) & M32
+      if j in key and key[j] != val:
+          return None
+      key[j] = val
+  if len(key) != KL:
+      return None
+  return [key[j] for j in range(KL)]
+
+def verify_s(s, key_words):
+  mt = forward_init_by_array(key_words)
+  for i in range(230, 344):
+     if i in s and s[i] != mt[i]:
+         return False
+  return True
+
+def try_solution(bits, leaked, verbose=False):
+  w0_top = bits & 1
+  W = []
+  for j in range(NW):
+      val = 0
+      base = 1 + j * 32
+      for b in range(32):
+          if (bits >> (base + b)) & 1:
+              val |= (1 << b)
+      W.append(val)
+  if verbose:
+      print(f" w0_top={w0_top} W[0]=0x{W[0]:08x} W[342]=0x{W[342]:08x}")
+  s = untwist(w0_top, W)
+  if verbose:
+      print(f" s[229]=0x{s[229]:08x} s[343]=0x{s[343]:08x}")
+  key = recover_key_18(s)
+  if key is None:
+      if verbose: print(" key18=None")
+      return None
+  ok = verify_s(s, key)
+  if verbose: print(f" forward-verify={'OK' if ok else 'FAIL'}")
+  if not ok:
+      return None
+  key_int = 0
+
+
+                                                                           78
+  for i in range(18):
+      key_int |= key[i] << (32 * i)
+  blob = key_int.to_bytes(72, "big")
+  seed = blob[:8]
+  tail = blob[8:]
+  if hashlib.sha512(seed).digest() != tail:
+      if verbose: print(" sha512 mismatch")
+      return None
+  rng2 = Random(seed)
+  rng2.getrandbits(32)
+  for i in range(len(leaked)):
+      if (rng2.getrandbits(32) >> 16) != leaked[i]:
+          if verbose: print(f" verify mismatch at {i}")
+          return None
+  rng = Random(seed)
+  secret = rng.getrandbits(32)
+  return seed.hex(), secret
+
+def solve(leaked, verbose=True):
+  print(f"[*] {len(leaked)} leaks")
+  rows, rhs, nvars = build_system(leaked)
+  print(f"[*] system: {len(rows)} eqs, {nvars} unknowns")
+  res = xor_basis_solve(rows, rhs, nvars)
+  if res is None:
+      print("[!] inconsistent")
+      return None
+  sol, free_vars = res
+  print(f"[*] free vars: {len(free_vars)} ({free_vars[:10]})")
+  if len(free_vars) > 20:
+      print("[!] too many free vars")
+      return None
+  for combo in range(1 << len(free_vars)):
+      bits = sol
+      for j, fv in enumerate(free_vars):
+          if (combo >> j) & 1:
+              bits ^= (1 << fv)
+      r = try_solution(bits, leaked, verbose=(verbose and combo < 3))
+      if r is not None:
+          print(f"[*] seed = {r[0]}")
+          print(f"[*] secret = {r[1]}")
+          print("[*] verified")
+          return r
+  print("[!] no valid solution")
+  return None
+
+def recv_until(sock, marker):
+  buf = b""
+  while marker not in buf:
+     c = sock.recv(4096)
+     if not c:
+
+
+                                                                        79
+       break
+     buf += c
+  return buf
+
+def solve_remote(host, port):
+  sock = socket.create_connection((host, port), timeout=60)
+  print(f"[*] connected to {host}:{port}")
+  buf = b""
+  while True:
+      c = sock.recv(4096)
+      if not c:
+          break
+      buf += c
+      if b"[" in buf and b"]" in buf and b"Seed (hex):" in buf:
+          break
+  text = buf.decode(errors="replace")
+  leaked = parse_leaked_from_text(text)
+  if not leaked:
+      print("[!] could not parse leaks")
+      sock.close()
+      return
+  r = solve(leaked, verbose=True)
+  if r is None:
+      print("[!] solve failed")
+      sock.close()
+      return
+  seed_hex, secret = r
+  sock.sendall((seed_hex + "\n").encode())
+  recv_until(sock, b"Secret: ")
+  sock.sendall((str(secret) + "\n").encode())
+  resp = sock.recv(4096)
+  print(resp.decode(errors="replace"))
+  sock.close()
+
+def main():
+  ap = argparse.ArgumentParser()
+  ap.add_argument("--file", "--proc", dest="data_file", help="local data file")
+  ap.add_argument("--remote", nargs="*", metavar="HOST PORT")
+  a = ap.parse_args()
+  if a.remote is not None:
+      host = a.remote[0] if len(a.remote) >= 1 else DEFAULT_HOST
+      port = int(a.remote[1]) if len(a.remote) >= 2 else DEFAULT_PORT
+      solve_remote(host, port)
+      return
+  if not a.data_file:
+      print("need --file or --remote")
+      return
+  leaked = parse_leaked_from_text(open(a.data_file).read())
+  solve(leaked)
+
+
+
+
+                                                                                  80
+ if __name__ == "__main__":
+     main()
+
+
+   7.​ Results
+bash
+ ┌──(crypto_env)(kiel㉿Kiel)-[/path/to/Paradise]
+ └─$ python3 solve.py --remote koala.nexsec.my 39876
+ [*] connected to koala.nexsec.my:39876
+ [*] 966 leaks
+ [*] system: 10976 eqs, 10977 unknowns
+ [*] free vars: 1 ([10976])
+   w0_top=0 W[0]=0x09201984 W[342]=0x4522f54a
+   s[229]=0x059f29bf s[343]=0xa144b9a3
+   forward-verify=OK
+ [*] seed = 3f6167a1a56b9c4d
+ [*] secret = 840528057
+ [*] verified
+ nexsec26{w0w_y0u_already_kn0w_Mersenne_Twister_nice_ecbbe0daa563c783470a616eba
+ 1edcdef820ee1e5732bb3741bf5da36646a7b6}
+
+
+
+
+Flag format:
+nexsec26{w0w_y0u_already_kn0w_Mersenne_Twister_nice_ecbbe0daa563c783470a616eba1
+edcdef820ee1e5732bb3741bf5da36646a7b6}
+
+
+
+
+                                                                             81
+

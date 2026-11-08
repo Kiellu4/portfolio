@@ -1,0 +1,271 @@
+4. Extracting Resources and Deriving the Root Key
+
+
+ import dnfile, hashlib
+ from Crypto.Cipher import AES
+ from Crypto.Util.Padding import unpad
+
+ dn = dnfile.dnPE('/mnt/c/Users/fl4me/Downloads/matryoshka_cex.exe')
+ res = {}
+ for r in dn.net.resources:
+     res[str(r.name)] = bytes(r.data)
+ # → {'doll-0': 116256, 'doll-1': 116768}
+
+ # AES base key = XOR of the three hex-decoded strings
+ s5 = '328c8951475e0d2c71a84c2f619af94727bef60eaadbe557cf5f82afd98d531b'
+ s6 = '1a685de80dadec0efc1a32e0d07fc450e68f1c348c9c00ad8a39395b380911ba'
+ s7 = '0641f85debb485f588745a946b1cbfd76257b2b18504b40ff60f304bbded9bc1'
+ key = bytearray(32)
+ for s in (s5, s6, s7):
+     b = bytes.fromhex(s)
+     for j in range(32):
+         key[j] ^= b[j]
+ XOR_KEY = bytes(key)
+ # = 2ea52ce4a14764d705c6245bdaf982c0a366588ba34351f5b3698bbf5c69d960
+
+ # Decrypt doll-0 and doll-1
+ for name, suffix in [('doll-0', b'0'), ('doll-1', b'1')]:
+     aes_key = hashlib.sha256(XOR_KEY + suffix).digest()
+     blob = res[name]
+     iv, ct = blob[:16], blob[16:]
+     plain = unpad(AES.new(aes_key, AES.MODE_CBC, iv).decrypt(ct), 16)
+     open(f'/tmp/matryoshka/{name}.dll', 'wb').write(plain)
+
+Both decrypt to valid .NET assemblies (MZ header, 116KB each).
+
+
+
+
+                                                                         36
+5. The Doll Class — Recursive Verification
+
+
+ // Child key derivation
+ public static byte[] DeriveChildKey(byte[] parentKey, string childPath)
+     => Sha256(parentKey || ASCII(childPath));
+
+ // AES-256-CBC decryption (IV = first 16 bytes, PKCS7)
+ public static byte[] DecryptBlob(byte[] blob, byte[] key) { ... }
+
+ // Load child via reflection, invoke entry method (string, byte[],
+ List<string>)
+ public static void InvokeChild(bool needed, string resName, string
+ childPath,
+     byte[] parentKey, string pw, List<string> story, string failLine) {
+ ... }
+
+ // HMAC-SHA256 verification
+ public static void Check(string pw, byte[] key, List<string> story) {
+     int length = PATH.Length;
+     // ... branch on bit `length` of low nibble ...
+     // HMAC data = [idx, high_nibble, (low_nibble >> length) & 1] (3
+ bytes)
+     // OR, if leaf (CHILD0_RES == null): [idx, full_char]          (2
+ bytes)
+ }
+
+
+
+
+                                                                         37
+6. Tree Structure (30 Dolls, 5 Levels)
+
+
+ doll-0 [0,1,4,6,8,11,14,15]                         doll-1 [2,3,5,7,9,10,12,13]
+ ├── doll-00 [1,4,11,14]                             ├── doll-10 [3,7,9,10]
+ │   ├── doll-000 [1,11]                             │   ├── doll-100 [3,7]
+ │   │   ├── doll-0000 [11] LEAF                     │   │   ├── doll-1000 [3] LEAF
+ │   │   └── doll-0001 [1] LEAF                      │   │   └── doll-1001 [7] LEAF
+ │   └── doll-001 [4,14]                             │   └── doll-101 [9,10]
+ │       ├── doll-0010 [4] LEAF                      │       ├── doll-1010 [10] LEAF
+ │       └── doll-0011 [14] LEAF                     │       └── doll-1011 [9] LEAF
+ └── doll-01 [0,6,8,15]                              └── doll-11 [2,5,12,13]
+     ├── doll-010 [0,15]                                 ├── doll-110 [12,2]
+     │   ├── doll-0100 [0] LEAF                          │   ├── doll-1100 [12] LEAF
+     │   └── doll-0101 [15] LEAF                         │   └── doll-1101 [2] LEAF
+     └── doll-011 [6,8]                                  └── doll-111 [5,13]
+         ├── doll-0110 [6] LEAF                              ├── doll-1110 [5] LEAF
+         └── doll-0111 [8] LEAF                              └── doll-1111 [13] LEAF
+ (CARRIES_FLAG)
+
+All 16 indices are verified exactly once by a leaf doll. doll-1111 carries the encrypted flag.(Tbh it
+was hell doing this manually in dnspy over and over until i fight with might blue whale for
+automation)
+
+7. The Complete Solver Script
+
+
+ #!/usr/bin/env python3
+ import os, re, hashlib, hmac
+ from Crypto.Cipher import AES
+ from Crypto.Util.Padding import unpad
+ import dnfile
+
+ WORK = '/mnt/c/Users/fl4me/Downloads'
+ TMP = '/tmp/matryoshka'
+ XOR =
+ bytes.fromhex('2ea52ce4a14764d705c6245bdaf982c0a366588ba34351f5b3698bbf
+ 5c69d960')
+
+ def sha(b): return hashlib.sha256(b).digest()
+ def hmac256(k, d): return hmac.new(k, d, hashlib.sha256).digest()
+ def dec(blob, key):
+     return unpad(AES.new(key, AES.MODE_CBC,
+ blob[:16]).decrypt(blob[16:]), 16)
+
+ def read_us_strings(path):
+     """Read all strings from #US heap via dnfile."""
+     dn = dnfile.dnPE(path)
+     out = []
+
+
+
+                                                                                                   38
+    # #US heap: dn.net.user_strings (in newer dnfile, .us)
+    # Simpler: parse the heap manually from dnfile's metadata stream
+    try:
+        us = dn.net.metadata.streams.get(b'#US')
+        data = us.__data__ if hasattr(us, '__data__') else
+us.get_data() if hasattr(us, 'get_data') else None
+    except Exception:
+        data = None
+    if data is None:
+        # fallback: read raw #US heap bytes via stream
+        md = dn.net.metadata
+        try:
+            us_stream = md.get_stream(b'#US')
+            data = us_stream.data
+        except Exception:
+            return []
+    # Parse #US: each entry = compressed length + UTF-16 bytes (with
+trailing flag byte)
+    i = 0
+    while i < len(data):
+        b = data[i]
+        if b == 0:
+            i += 1; continue
+        # Compressed uint length
+        if (b & 0x80) == 0:
+            length = b; i += 1
+        elif (b & 0xC0) == 0x80:
+            length = ((b & 0x3F) << 8) | data[i+1]; i += 2
+        elif (b & 0xE0) == 0xC0:
+            length = ((b & 0x1F) << 24) | (data[i+1] << 16) |
+(data[i+2] << 8) | data[i+3]; i += 4
+        else:
+            i += 1; continue
+        if length == 0 or i + length > len(data):
+            i += max(1, length); continue
+        raw = data[i:i+length]; i += length
+        # UTF-16 LE, drop trailing flag byte
+        try:
+            s = raw[:-1].decode('utf-16-le', errors='ignore')
+            out.append(s)
+        except Exception:
+            pass
+    return out
+
+def get_constants(path):
+    """Extract path, hmacs, flag_enc from a doll DLL."""
+    dn = dnfile.dnPE(path)
+    us = read_us_strings(path)
+    # asm name (from Assembly table)
+
+
+
+                                                                       39
+    asm = None
+    if dn.net.mdtables.Assembly:
+        asm = str(dn.net.mdtables.Assembly[0].Name)
+    path_ = asm.split('-', 1)[1] if asm and '-' in asm else None
+    # HMACs: 64-hex strings
+    hexs = [s for s in us if re.fullmatch(r'[0-9a-f]{64}', s)]
+    hmacs = hexs
+    # FLAG_ENC: 64+ hex not in hmacs
+    flag_enc = None
+    for s in us:
+        if re.fullmatch(r'[0-9a-f]{64,}', s) and s not in hmacs:
+            flag_enc = s; break
+    # resources
+    resources = {str(r.name): bytes(r.data) for r in dn.net.resources}
+if dn.net.resources else {}
+    return asm, path_, hmacs, flag_enc, resources
+
+def try_leaf(dll_path, parent_key):
+    asm, path_, hmacs, flag_enc, _ = get_constants(dll_path)
+    print(f" LEAF {asm}: hmacs={len(hmacs)}, flag_enc={'yes' if
+flag_enc else 'no'}")
+    if not hmacs:
+        print(f"    [!] no HMACs found in {asm}")
+        return
+    target = bytes.fromhex(hmacs[0])
+    for idx in range(16):
+        for c in range(0x20, 0x7f):
+            if hmac256(parent_key, bytes([idx, c])) == target:
+                print(f"    *** pw[{idx}] = {chr(c)!r} ***")
+                pw_locked[idx] = chr(c)
+    if flag_enc:
+        print(f"    *** FLAG_ENC: {flag_enc} ***")
+
+def walk(dll_path, parent_key, depth=0):
+    asm, path_, hmacs, flag_enc, resources = get_constants(dll_path)
+    is_leaf = not any(k.startswith('doll-') for k in resources)
+    print(f"{' '*depth}>>> {asm} (path={path_},
+resources={list(resources.keys())}, leaf={is_leaf})")
+    if is_leaf:
+        try_leaf(dll_path, parent_key)
+        return
+    for suffix, child_name in [('0', f'doll-{path_}0'), ('1',
+f'doll-{path_}1')]:
+        if child_name not in resources:
+            continue
+        child_path = path_ + suffix
+        child_key = sha(parent_key + child_path.encode('ascii'))
+        plain = dec(resources[child_name], child_key)
+        out = f'{TMP}/{child_name}.dll'
+
+
+
+                                                                       40
+       open(out, 'wb').write(plain)
+       walk(out, child_key, depth+1)
+
+pw_locked = {}
+
+# Roots
+for i, suffix in [(0, b'0'), (1, b'1')]:
+    blob = open(f'{TMP}/doll-{i}.bin', 'rb').read()
+    L1 = sha(XOR + suffix)
+    open(f'{TMP}/doll-{i}.dll', 'wb').write(dec(blob, L1))
+
+print("========== doll-0 ==========")
+walk(f'{TMP}/doll-0.dll', sha(XOR + b'0'))
+print("\n========== doll-1 ==========")
+walk(f'{TMP}/doll-1.dll', sha(XOR + b'1'))
+
+print("\n" + "="*60)
+for i in range(16):
+    print(f" pw[{i:2d}] = {pw_locked.get(i, '?')!r}")
+
+if len(pw_locked) == 16:
+    pw = ''.join(pw_locked[i] for i in range(16))
+    print(f"\nPASSWORD: {pw!r}")
+    h = hashlib.sha256(pw.encode()).hexdigest()
+    expected =
+'77aa4d230ca164172ea2c972e207cb93dae2d0bd5e5fd3234ff4b5ea8874e345'
+    print(f"SHA256: {h}")
+    print(f"EXPECT: {expected}")
+    print("MATCH!" if h == expected else "MISMATCH")
+
+PASSWORD: 'rhkaDwfinMePcolz'
+SHA256:
+77aa4d230ca164172ea2c972e207cb93dae2d0bd5e5fd3234ff4b5ea8874e345
+EXPECT:
+77aa4d230ca164172ea2c972e207cb93dae2d0bd5e5fd3234ff4b5ea8874e345
+MATCH!
+
+
+
+
+                                                                     41
+

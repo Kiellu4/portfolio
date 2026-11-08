@@ -1,0 +1,133 @@
+ XIO I:1/0    (guard door closed)
+ XIO I:1/1    (E-stop not pressed)
+ XIC I:1/2    (LOCAL)
+ XIO I:1/5    (no thermal overload)
+The live rung still honours E-Stop, LOCAL and thermal overload — those inputs never appear in
+an unsafe state while the motor runs. But the guard-door check is gone: the live rung no longer
+examines I:1/0 at all. Instead the rung's guard permissive is the maintenance keyswitch:
+ XIC I:1/3    (maintenance key inserted) <-- replaces XIO I:1/0
+An XIC on I:1/3 is exactly what a technician would write to turn the "maintenance override" into a
+permanent permissive: the rung passes whenever the key is turned, regardless of the guard
+door. That matches the operator story ("it runs with the door open") and the annunciator
+evidence (BypassActive_Lamp lit).
+So the single differing contact is:
+                                 Instruction                      Address
+
+ Baseline                        XIO                              I:1/0 (GuardDoor_Open)
+
+ Live                            XIC                              I:1/3 (MaintKey_Inserted)
+The programme is therefore not a simple bit inversion — it is a permissive substitution: the
+guard-door check was replaced by the maintenance-key check.
+
+   6.​ Building the Flag
+Format:
+ nexsec26{<baseline_instruction>_<baseline_address>_<live_instruction>_<live_address>_<r
+ esident_checksum>}
+with : and / in addresses replaced by _ (so I:1/0 → I_1_0).
+    ●​ Baseline instruction / address: XIO / I_1_0
+    ●​ Live instruction / address: XIC / I_1_3
+    ●​ Resident checksum: 6F3A91D4
+
+    7.​ Solve Script
+python:
+ #!/usr/bin/env python3
+ """
+ solve.py - NEXSEC CTF 2026 "Lumi the Analyst"
+ Detects the swapped permissive by finding which inputs correlate
+ with Motor_Run across the live test pattern, then compares against
+ the baseline rung-0 permissive set.
+ """
+ import time, sys
+ from pymodbus.client import ModbusTcpClient
+
+ HOST, PORT, DEVICE_ID = "koala.nexsec.my", 35740, 1
+
+
+
+                                                                                               93
+# baseline permissives: addr -> (instr, safe_val, desc)
+BASELINE = {
+  0: ("XIO", 0, "GuardDoor_Open"),
+  1: ("XIO", 0, "EStop_Pressed"),
+  2: ("XIC", 1, "Local_Mode"),
+  5: ("XIO", 0, "ThermalOL_Trip"),
+}
+
+def rd_inputs(c):
+  r = c.read_discrete_inputs(address=0, count=6, device_id=DEVICE_ID)
+  return list(r.bits[:6])
+def rd_coils(c):
+  r = c.read_coils(address=0, count=4, device_id=DEVICE_ID)
+  return list(r.bits[:4])
+def rd_regs(c, a, n):
+  r = c.read_holding_registers(address=a, count=n, device_id=DEVICE_ID)
+  return list(r.registers)
+
+def main():
+  c = ModbusTcpClient(HOST, port=PORT)
+  if not c.connect(): sys.exit("connect failed")
+  regs = rd_regs(c, 2, 2)
+  cksum = (regs[0] << 16) | regs[1]
+  print(f"[*] live checksum = 0x{cksum:08X} (baseline 0x5C14A7B3)")
+
+  samples = []
+  t0 = time.time()
+  while time.time() - t0 < 25:
+     try: samples.append((rd_inputs(c), rd_coils(c)))
+     except Exception as e: print("err", e)
+     time.sleep(0.5)
+
+  # Find inputs that are 1 whenever Motor_Run=1 (candidate "live permissive")
+  print("\n[*] Input values when Motor_Run=1:")
+  live_ones = set(range(6))
+  live_zeros = set(range(6))
+  motor_samples = 0
+  for inp, out in samples:
+     if out[0] != 1: continue
+     motor_samples += 1
+     for i, v in enumerate(inp):
+         if v == 1: live_zeros.discard(i) if i in live_zeros else None
+         # track: is this input always 1 during motor run? always 0?
+     live_ones &= {i for i, v in enumerate(inp) if v == 1}
+  # simpler: for each input, check correlation with Motor_Run
+  print(f" ({motor_samples} samples with Motor_Run=1)")
+
+  # Identify which input is the *new* permissive: an input not in BASELINE
+  # that reads 1 whenever the motor runs.
+  always_one_during_run = []
+
+
+                                                                                94
+   for i in range(6):
+      ok = all(s[0][i] == 1 for s in samples if s[1][0] == 1) and motor_samples > 0
+      if ok: always_one_during_run.append(i)
+   print(f"[*] Inputs always 1 while Motor_Run=1: {always_one_during_run}")
+
+   # The tampered rung replaced baseline I:1/0 (XIO) with XIC on some input.
+   # That input must be 1 during run (XIC passes on 1) and NOT in baseline-as-is.
+   # I:1/3 is the maintenance key -> XIC passes when key inserted.
+   for cand in always_one_during_run:
+      if cand == 2: # Local_Mode is a legit XIC baseline permissive
+          continue
+      live_instr = "XIC" if BASELINE.get(cand, ("XIC",))[0] != "XIC" else "XIC"
+      flag = f"nexsec26{{XIO_I_1_0_XIC_I_1_{cand}_{cksum:08X}}}"
+      print(f"\n[+] candidate (I:1/{cand} is the swapped-in permissive):")
+      print(f" {flag}")
+   c.close()
+
+ if __name__ == "__main__":
+     main()
+
+
+
+
+I:1/2 (Local_Mode) is filtered out as the legitimate baseline XIC; I:1/3 is the maintenance key
+that replaced the guard-door permissive.
+
+Flag format: nexsec26{XIO_I_1_0_XIC_I_1_3_6F3A91D4}
+
+
+
+
+                                                                                                  95
+

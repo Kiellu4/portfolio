@@ -1,0 +1,330 @@
+Mirror Image
+
+
+
+
+Files: chall.py​
+Host: koala.nexsec.my Port: 35405
+Link deepseek: https://chat.deepseek.com/share/6gi1luss4o4ifeapyp ​
+
+
+
+
+                                                                      82
+cat chall.py:
+ import signal
+ import sys
+ from hashlib import sha256
+ from secrets import randbelow, randbits, token_bytes
+
+ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+ MIRRORS = 112
+ BITS = 16
+ SHADOWS = 2
+ CASTER = 1024
+ LIMIT = 120
+
+
+ def hall(lo, hi):
+   sieve = bytearray([1]) * (hi + 1)
+   sieve[0:2] = b"\x00\x00"
+   for i in range(2, int(hi ** 0.5) + 1):
+      if sieve[i]:
+          sieve[i * i::i] = bytearray(len(range(i * i, hi + 1, i)))
+   return [p for p in range(lo, hi + 1) if sieve[p]]
+
+
+ def pick(pool, count):
+   pool = list(pool)
+   return [pool.pop(randbelow(len(pool))) for _ in range(count)]
+
+
+ def shuffle(xs):
+   for i in range(len(xs) - 1, 0, -1):
+      j = randbelow(i + 1)
+      xs[i], xs[j] = xs[j], xs[i]
+
+
+ def main():
+   flag = open("flag.txt").read().strip().encode()
+   mirrors = pick(hall(1 << (BITS - 1), (1 << BITS) - 1), MIRRORS)
+   s = randbits(CASTER)
+
+   print("The archmage steps into the hall of mirrors and casts Mirror Image.")
+   print("Each mirror throws back a few shadows; exactly one shadow per mirror is the real
+ one.")
+   for m in mirrors:
+      shadows = [s % m]
+      while len(shadows) < SHADOWS:
+         r = randbelow(m)
+         if r not in shadows:
+             shadows.append(r)
+      shuffle(shadows)
+
+
+                                                                                             83
+      print("mirror =", (m, tuple(shadows)))
+
+   key = sha256(s.to_bytes(CASTER // 8, "big")).digest()
+   nonce = token_bytes(12)
+   print("ward =", (nonce.hex(), AESGCM(key).encrypt(nonce, flag, None).hex()))
+   sys.stdout.flush()
+
+
+ if __name__ == "__main__":
+     signal.alarm(LIMIT)
+     main()
+
+The server picks:
+    ●​ 112 random 16‑bit primes m₁ … m₁₁₂ (all in [2^15, 2^16))
+    ●​ A secret s, uniformly random in [0, 2^1024) (1024‑bit integer)
+For each prime mᵢ, it reveals:
+    ●​ s mod mᵢ (the true residue)
+    ●​ rᵢ (a random decoy in [0, mᵢ))
+In random order, so we get a pair (aᵢ, bᵢ) with exactly one being s mod mᵢ. Finally, it derives key
+= SHA256(s), encrypts the flag with AES‑GCM, and prints (nonce, ciphertext) as ward.
+
+Why naive CRT fails​
+If we knew which residue in each pair was correct, we'd just CRT them:
+    ●​ Product of all 112 primes: ∏ mᵢ ≈ 2^(15.5 × 112) ≈ 2^1736
+    ●​ Since s < 2^1024 < 2^1736, CRT gives s uniquely.
+But we have two choices per mirror, so there are 2^112 possible residue combinations. Only
+one gives a CRT result < 2^1024; every other choice produces a uniform value in [0, 2^1736),
+which is < 2^1024 with probability 2^(-712). So the correct combination is unique, but we can't
+enumerate 2^112.
+
+Why this is a lattice problem
+For each mirror, define:
+   ●​ aᵢ = first shadow, bᵢ = second shadow
+   ●​ Δᵢ = (bᵢ − aᵢ) mod mᵢ
+   ●​ δᵢ ∈ {0, 1} — which shadow is real
+ s ≡ aᵢ + δᵢ · Δᵢ (mod mᵢ)
+Multiply both sides by Δᵢ⁻¹ mod mᵢ:
+ s · invᵢ − aᵢ · invᵢ ≡ δᵢ (mod mᵢ)
+where invᵢ = Δᵢ⁻¹ mod mᵢ. Rearranged as an integer equation:
+ s · invᵢ − kᵢ · mᵢ − baseᵢ = δᵢ      (*)
+with baseᵢ = (aᵢ · invᵢ) mod mᵢ, kᵢ ∈ ℤ, and δᵢ ∈ {0, 1}.
+This is exactly the Hidden Number Problem (HNP): we know s is small (1024 bits) and the
+"error" δᵢ is tiny (0 or 1) for 112 equations. Lattice reduction (LLL) recovers s.
+
+
+                                                                                                  84
+Constructing the Lattice
+From (*), the vector we want to be short is:
+ (W·δ₀, W·δ₁, …, W·δ_{n−1}, s, W)
+The W = 2^1024 factor on the δ coordinates balances magnitudes: the δᵢ are 0/1 (tiny), while s ~
+2^1024. Without scaling, LLL would ignore the tiny δ coordinates. After scaling, both W·δᵢ and s
+are the same order.
+The last coordinate W is the embedding/marker column only the base row touches it, which lets
+the lattice contain a vector of the exact shape above.
+
+Basis (dimension n + 2)
+         Column range                          Meaning                        Weight
+
+ 0 … n−1                          residue / δ coordinates         W
+
+ n                                carries s                       1
+
+ n+1                              embedding marker                W
+Rows:
+ row i (i < n): W·mᵢ in col i
+ row n        : W·invᵢ in cols 0..n−1, 1 in col n ← carries s
+ row n+1      : W·baseᵢ in cols 0..n−1, W in col n+1
+Key points:
+   ●​ The invᵢ row is what makes s appear — without it, column n is identically zero and s is
+       invisible to the lattice.
+   ●​ The mᵢ diagonal rows "kill" the kᵢ.
+   ●​ The baseᵢ row plus its W in the embedding column provides the short target vector.
+
+The planted short vector
+ s·(inv row) − Σ kᵢ·(row i) − 1·(base row)
+  = ( W·δ₀, …, W·δ_{n−1}, s, −W )
+Last entry is −W; column n is s. So in the reduced basis we find the row with last entry ±W, then
+read s from column n, flipping the sign to match.
+
+First, I download the sage from Github: https://github.com/conda-forge/miniforge
+bash
+ ┌──(crypto_env)(kiel㉿Kiel)-[/path/to/Mirror-Image]
+ └─$ curl -L -O
+ "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(un
+ ame -m).sh"​
+ ┌──(crypto_env)(kiel㉿Kiel)-[/path/to/Mirror-Image]
+ └─$ bash Miniforge3-$(uname)-$(uname -m).sh
+
+
+
+
+                                                                                                85
+Then, I created the sage.​
+bash
+ ┌──(crypto_env)(kiel㉿Kiel)-[/path/to/Mirror-Image]
+ └─$ source ~/.bashrc​
+ (base) ┌──(crypto_env)(kiel㉿Kiel)-[/mnt/e/CTF]
+ └─$ conda create -n sage sage -y​
+ (base) ┌──(crypto_env)(kiel㉿Kiel)-[/mnt/e/CTF]
+ └─$ conda activate sage
+​
+Finally, I ran the file solve.sage to get the flag.​
+solve.sage:
+ #!/usr/bin/env sage
+ from sage.all import *
+ import ast, socket
+ from hashlib import sha256
+ from Crypto.Cipher import AES
+
+ HOST = str("koala.nexsec.my")
+ PORT = int(35405)
+ TIMEOUT = int(30)
+
+ # ---------------- connect & read ----------------
+ sock = socket.create_connection((HOST, PORT), timeout=TIMEOUT)
+ buf = b""
+ while True:
+    try:
+        chunk = sock.recv(65536)
+    except socket.timeout:
+        break
+    if not chunk:
+        break
+    buf += chunk
+    if b"ward =" in buf and buf.rstrip().endswith(b")"):
+        break
+ sock.close()
+ lines = buf.decode(errors="replace").splitlines()
+
+ data, ward = [], None
+ for ln in lines:
+    ln = ln.strip()
+    if ln.startswith("mirror ="):
+        v = ast.literal_eval(ln.split("=", 1)[1].strip())
+        data.append((Integer(v[0]), tuple(Integer(x) for x in v[1])))
+    elif ln.startswith("ward ="):
+        ward = ast.literal_eval(ln.split("=", 1)[1].strip())
+ assert ward is not None and data
+ print(f"[*] {len(data)} mirrors parsed")
+
+
+
+
+                                                                                    86
+# ---------------- HNP lattice ----------------
+# s*inv_i - k_i*m_i - base_i = delta_i, delta_i in {0,1}
+# inv_i = (b_i - a_i)^{-1} mod m_i
+# base_i = a_i * inv_i mod m_i
+#
+# dim = n+2:
+# cols 0..n-1 : delta coords, weighted by W
+# col n         : s coordinate (only the inv row puts '1' here)
+# col n+1 : embedding col, only the base row (= W)
+#
+# rows:
+# i<n : W*m_i in col i
+# n : W*inv_i in cols 0..n-1, 1 in col n               <-- carries s
+# n+1 : W*base_i in cols 0..n-1, W in col n+1
+#
+# short vector = s*(inv row) - sum k_i*(row i) - 1*(base row)
+#            = (W*delta_i, s, -W)       -> last entry -W, col n = s
+# (sign convention: the -1*(base row) gives last = -W; col n = s directly)
+# But depending on how LLL orients the vector we may see (…, -s, W), hence
+# the sign pairing below.
+
+W = 2**1024
+ms = [data[i][0] for i in range(len(data))]
+opts = [data[i][1] for i in range(len(data))]
+a_i = [o[0] for o in opts]
+b_i = [o[1] for o in opts]
+diff = [(b_i[i] - a_i[i]) % ms[i] for i in range(len(ms))]
+inv = [inverse_mod(diff[i], ms[i]) for i in range(len(ms))]
+base = [ (a_i[i] * inv[i]) % ms[i] for i in range(len(ms)) ]
+
+n = len(ms)
+dim = n + 2
+print(f"[*] lattice dim {dim}")
+
+rows = []
+for i in range(n):
+   r = [0]*dim; r[i] = W * ms[i]; rows.append(r)
+
+r = [0]*dim
+for i in range(n):
+   r[i] = W * inv[i]
+r[n] = 1                # carries s into column n
+rows.append(r)
+
+r = [0]*dim
+for i in range(n):
+   r[i] = W * base[i]
+r[n+1] = W
+rows.append(r)
+
+
+
+
+                                                                             87
+L = Matrix(ZZ, rows)
+print("[*] LLL ...")
+red = L.LLL()
+print("[*] done")
+
+def verify(s):
+  s = Integer(s)
+  return (0 < s < 2**1024 and
+        all((s % ms[i]) in opts[i] for i in range(n)))
+
+def extract(reduced):
+  for r in reduced:
+     last = r[n+1]
+     if last == -W:
+         s = r[n]
+     elif last == W:
+         s = -r[n]
+     else:
+         continue
+     if verify(s):
+         return s
+  return None
+
+sol = extract(red)
+if sol is None:
+    print("[*] LLL miss, trying BKZ ...")
+    for bs in (20, 30, 40):
+       red = L.BKZ(block_size=bs)
+       sol = extract(red)
+       if sol is not None:
+           print(f"[+] BKZ recovered s (bs={bs})")
+           break
+assert sol is not None, "recovery failed"
+s = Integer(sol)
+print("[+] s verified against ALL mirrors")
+
+# ---------------- decrypt ----------------
+nonce_hex, ct_hex = ward
+key = sha256(int(s).to_bytes(1024//8, "big")).digest()
+nonce = bytes.fromhex(nonce_hex); ct = bytes.fromhex(ct_hex)
+body, tag = ct[:-16], ct[-16:]
+cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+flag = cipher.decrypt_and_verify(body, tag)
+print("[+] FLAG:", flag.decode(errors="replace"))
+
+
+
+
+                                                               88
+Output:
+
+
+
+
+                                                                             ​
+
+Flag format:
+nexsec26{YOU_WILL_NEVER_CATCH_ME_HIDING_BETWEEN_ALL_OF_THESE_MIRROR
+S_D20_I_CAST_MIRROR_IMAGE_3e607901e6cb9d3a13c770ae03e45c0c7a8ade2a54bd9c4f
+892c466a2a9d704c}
+
+
+
+
+                                                                        89
+
