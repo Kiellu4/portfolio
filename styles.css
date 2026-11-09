@@ -1,11 +1,12 @@
 :root{--bg:#080c10;--surface:#0f171d;--surface-2:#121e26;--text:#e9f1f2;--muted:#9baeb3;--line:#26363d;--accent:#35d0ba;--accent-ink:#06231f;--shadow:0 16px 45px rgba(0,0,0,.2)}
 /* Header structure: brand | centred navigation and utility controls. */
 html body header.site-header.site-header .nav.nav.nav.container{position:relative;display:flex;align-items:center;justify-content:center;width:min(1440px,calc(100% - 2rem));min-height:52px;margin-inline:auto;padding:0}
-html body header.site-header.site-header .brand{position:absolute;left:0;flex:0 0 auto;color:var(--accent);font:700 1rem "JetBrains Mono",monospace;text-decoration:none}
+html body header.site-header.site-header .nav-main .brand{position:static;display:inline-block;flex:0 0 auto;margin-right:.12rem;color:var(--accent);font:700 1rem "JetBrains Mono",monospace}
 html body header.site-header.site-header .nav-middle{display:flex;align-items:center;justify-content:center;gap:.65rem;max-width:calc(100% - 3rem);flex-wrap:wrap}
 html body header.site-header.site-header .nav-links.nav-main{display:flex;align-items:center;justify-content:center;gap:.4rem;min-width:0;flex-wrap:wrap;margin:0}
 html body header.site-header.site-header .nav-links.nav-main a{white-space:nowrap;font-size:.62rem;padding:.16rem .36rem}
 html body header.site-header.site-header .nav-links.nav-main a span{display:inline;font-size:.68rem}
+html body header.site-header.site-header .nav-links.nav-main a .nav-roman{display:inline;font:inherit}
 html body header.site-header.site-header .nav-widgets{display:flex;align-items:center;justify-content:center;gap:.5rem;flex:0 0 auto}
 html body header.site-header.site-header .nav-widgets .theme-toggle{order:0}
 html body header.site-header.site-header .brand.nav-active{background:transparent;border-color:transparent;color:var(--accent)}
@@ -14,6 +15,8 @@ html body header.site-header.site-header .brand.nav-active{background:transparen
  html body header.site-header.site-header .nav-links.nav-main{gap:.3rem}
  html body header.site-header.site-header .nav-links.nav-main a{font-size:.57rem;padding:.13rem .28rem}
  html body header.site-header.site-header .nav-links.nav-main a span{font-size:.61rem}
+ html body header.site-header.site-header .nav-links.nav-main a .nav-label{display:none}
+ html body header.site-header.site-header .nav-links.nav-main a .nav-roman{display:inline}
 }
 @media (max-width:900px){
  html body header.site-header.site-header .nav-widgets .status-working,
@@ -22,11 +25,13 @@ html body header.site-header.site-header .brand.nav-active{background:transparen
 }
 @media (max-width:800px){
  html body header.site-header.site-header .nav.nav.nav.container{justify-content:flex-start;width:calc(100% - 2rem)}
- html body header.site-header.site-header .brand{position:static}
- html body header.site-header.site-header .menu-button{display:flex;flex:0 0 auto;margin-left:auto}
- html body header.site-header.site-header .nav-middle{margin-left:.55rem;max-width:none;flex-wrap:nowrap}
- html body header.site-header.site-header .nav-links.nav-main{display:none;position:absolute;top:52px;right:0;left:0;z-index:10;padding:.75rem;background:var(--surface);border:1px solid var(--line);flex-direction:column;align-items:stretch}
- html body header.site-header.site-header .nav-links.nav-main.open{display:flex}
+ html body header.site-header.site-header .menu-button{display:flex;flex:0 0 auto;order:2;margin-left:auto}
+ html body header.site-header.site-header .nav-middle{order:1;margin-left:0;max-width:none;flex-wrap:nowrap}
+ html body header.site-header.site-header .nav-links.nav-main{display:flex;position:static;padding:0;border:0;flex-direction:row;align-items:center}
+ html body header.site-header.site-header .nav-links.nav-main a:nth-of-type(n+2){display:none}
+ html body header.site-header.site-header .nav-links.nav-main.open{position:absolute;top:52px;right:0;left:0;z-index:10;padding:.75rem;background:var(--surface);border:1px solid var(--line);flex-direction:column;align-items:stretch}
+ html body header.site-header.site-header .nav-links.nav-main.open a{display:block}
+ html body header.site-header.site-header .nav-links.nav-main.open .brand{display:none}
  html body header.site-header.site-header .nav-links.nav-main a{padding:.45rem .6rem;font-size:.72rem}
  html body header.site-header.site-header .nav-links.nav-main a span{font-size:.83rem}
 }
