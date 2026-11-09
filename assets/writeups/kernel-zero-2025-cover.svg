@@ -1,12 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
-  <title id="title">Kernel-Ø CTF 2025 cover</title>
-  <desc id="desc">An original dark cover with cyan terminal-inspired line work for Kernel-Ø CTF 2025.</desc>
-  <rect width="1600" height="900" fill="#080c10"/>
-  <g fill="none" stroke="#35d0ba" opacity=".22"><path d="M-20 156H534L660 282H1620"/><path d="M-20 660H280L431 509H1170L1308 647H1620"/><circle cx="660" cy="282" r="7" fill="#35d0ba"/><circle cx="431" cy="509" r="7" fill="#35d0ba"/><circle cx="1308" cy="647" r="7" fill="#35d0ba"/></g>
-  <rect x="92" y="96" width="1416" height="708" rx="12" fill="#0f171d" stroke="#26363d"/>
-  <text x="150" y="190" fill="#35d0ba" font-family="JetBrains Mono, monospace" font-size="28" font-weight="700" letter-spacing="5">CTF WRITE-UPS / 2025</text>
-  <text x="150" y="410" fill="#e9f1f2" font-family="JetBrains Mono, monospace" font-size="114" font-weight="700" letter-spacing="-7">KERNEL-Ø</text>
-  <text x="158" y="500" fill="#9baeb3" font-family="Inter, sans-serif" font-size="38">Challenge notes · methods · lessons learned</text>
-  <text x="150" y="724" fill="#35d0ba" font-family="JetBrains Mono, monospace" font-size="32" font-weight="700">2025</text>
-  <text x="1390" y="724" fill="#35d0ba" font-family="JetBrains Mono, monospace" font-size="32" font-weight="700">01</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675" role="img" aria-labelledby="title desc">
+  <title id="title">Kernel-Ø CTF GMI 2025 cover</title>
+  <desc id="desc">Original dark terminal-style cover with cyan system nodes for Kernel-Ø CTF GMI 2025.</desc>
+  <rect width="1200" height="675" fill="#080c10"/>
+  <g fill="#35d0ba" opacity=".15"><rect x="802" y="82" width="86" height="86"/><rect x="914" y="82" width="174" height="86"/><rect x="1114" y="82" width="48" height="48"/><rect x="54" y="492" width="174" height="86"/><rect x="254" y="530" width="48" height="48"/><rect x="328" y="492" width="86" height="86"/></g>
+  <g fill="none" stroke="#35d0ba" opacity=".72"><path d="M0 166h160l70 70h210l78-78h176l70 70h436"/><path d="M0 514h194l76-76h190l72 72h162l84-84h402"/><path d="M730 0v112l70 70v88"/><path d="M484 675V560l-64-64v-88"/></g>
+  <g fill="#35d0ba"><circle cx="230" cy="236" r="7"/><circle cx="518" cy="158" r="7"/><circle cx="764" cy="228" r="7"/><circle cx="270" cy="438" r="7"/><circle cx="532" cy="510" r="7"/><circle cx="778" cy="426" r="7"/></g>
+  <text x="86" y="310" fill="#e9f1f2" font-family="monospace" font-size="59" font-weight="700">KERNEL-Ø CTF</text>
+  <text x="90" y="370" fill="#35d0ba" font-family="monospace" font-size="29">GMI · 2025 / HUMBLEBEE</text>
+  <text x="90" y="430" fill="#9baeb3" font-family="monospace" font-size="19">1st place · 22 write-ups · system online</text>
 </svg>

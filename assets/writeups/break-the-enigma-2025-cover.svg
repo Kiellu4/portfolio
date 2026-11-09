@@ -1,13 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
-  <title id="title">BreakTheEnigma CTF 2025 cover</title>
-  <desc id="desc">An original dark cover with cyan abstract cipher rings for BreakTheEnigma CTF 2025.</desc>
-  <rect width="1600" height="900" fill="#080c10"/>
-  <g fill="none" stroke="#35d0ba"><circle cx="1216" cy="386" r="212" opacity=".15"/><circle cx="1216" cy="386" r="140" opacity=".28"/><circle cx="1216" cy="386" r="68" opacity=".5"/><path d="M1216 134v504M964 386h504" opacity=".22"/></g>
-  <rect x="92" y="96" width="1416" height="708" rx="12" fill="#0f171d" stroke="#26363d"/>
-  <text x="150" y="190" fill="#35d0ba" font-family="JetBrains Mono, monospace" font-size="28" font-weight="700" letter-spacing="5">CTF WRITE-UPS / 2025</text>
-  <text x="150" y="372" fill="#e9f1f2" font-family="JetBrains Mono, monospace" font-size="86" font-weight="700" letter-spacing="-6">BREAK THE</text>
-  <text x="150" y="476" fill="#35d0ba" font-family="JetBrains Mono, monospace" font-size="104" font-weight="700" letter-spacing="-7">ENIGMA</text>
-  <text x="158" y="562" fill="#9baeb3" font-family="Inter, sans-serif" font-size="38">Challenge notes · methods · lessons learned</text>
-  <text x="150" y="724" fill="#35d0ba" font-family="JetBrains Mono, monospace" font-size="32" font-weight="700">2025</text>
-  <text x="1390" y="724" fill="#35d0ba" font-family="JetBrains Mono, monospace" font-size="32" font-weight="700">02</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675" role="img" aria-labelledby="title desc">
+  <title id="title">BTE CTF GMI 2025 cover</title>
+  <desc id="desc">Original dark terminal-style cover with cyan cipher blocks for BTE CTF GMI 2025.</desc>
+  <rect width="1200" height="675" fill="#080c10"/>
+  <g fill="#35d0ba" opacity=".15"><rect x="72" y="84" width="94" height="94"/><rect x="190" y="84" width="46" height="46"/><rect x="260" y="84" width="94" height="94"/><rect x="846" y="452" width="94" height="94"/><rect x="964" y="500" width="46" height="46"/><rect x="1034" y="452" width="94" height="94"/></g>
+  <g fill="none" stroke="#35d0ba" opacity=".72"><path d="M0 205h176l64 64h222l72-72h176l68 68h422"/><path d="M0 501h224l72-72h144l80 80h210l70-70h420"/><path d="M930 0v104l-60 60v112"/><path d="M260 675V570l62-62v-98"/></g>
+  <g fill="#35d0ba"><circle cx="240" cy="269" r="7"/><circle cx="534" cy="197" r="7"/><circle cx="778" cy="265" r="7"/><circle cx="296" cy="429" r="7"/><circle cx="520" cy="509" r="7"/><circle cx="800" cy="439" r="7"/></g>
+  <text x="86" y="310" fill="#e9f1f2" font-family="monospace" font-size="63" font-weight="700">BTE CTF</text>
+  <text x="90" y="370" fill="#35d0ba" font-family="monospace" font-size="29">GMI · 2025 / KIELLU4</text>
+  <text x="90" y="430" fill="#9baeb3" font-family="monospace" font-size="19">solo · 2nd runner-up · break the enigma</text>
 </svg>
