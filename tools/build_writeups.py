@@ -9,6 +9,18 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CONTENT = ROOT / "content" / "writeups"
 OUTPUT = ROOT / "writeups"
+CARD_VCF = """BEGIN:VCARD
+VERSION:3.0
+FN:Ezekiel Mukhriz
+TITLE:System Engineer
+ORG:MyOne Corporation
+EMAIL:ezekiel@myonecorp.com
+URL:https://kiellu4.github.io/portfolio/
+ADR:;;Unit 19-3\\, Block C1 Dataran Prima\\, Jalan PJU 1/41;Petaling Jaya;Selangor;47301;Malaysia
+SOCIAL;type=linkedin:https://www.linkedin.com/in/ezekiel-mukhriz
+SOCIAL;type=github:https://github.com/Kiellu4
+END:VCARD
+"""
 
 
 def e(value: object) -> str:
@@ -128,6 +140,7 @@ def render(data: dict) -> str:
 
 
 def main() -> None:
+    (ROOT / "assets" / "card.vcf").write_text(CARD_VCF, encoding="utf-8")
     for source in sorted(CONTENT.glob("*.json")):
         data = json.loads(source.read_text(encoding="utf-8"))
         target = OUTPUT / data["output"]

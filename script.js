@@ -40,6 +40,19 @@ if (themeButton) {
   });
 }
 
+const navClock = document.querySelector('.nav-clock');
+if (navClock) {
+  const time = navClock.querySelector('span');
+  const date = navClock.querySelector('small');
+  const updateNavClock = () => {
+    const now = new Date();
+    time.textContent = now.toLocaleTimeString('en-GB', { hour12: false });
+    date.textContent = now.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  };
+  updateNavClock();
+  window.setInterval(updateNavClock, 1000);
+}
+
 const observer = new IntersectionObserver((entries) => entries.forEach((entry) => {
   if (entry.isIntersecting) {
     entry.target.classList.add('visible');
@@ -47,6 +60,27 @@ const observer = new IntersectionObserver((entries) => entries.forEach((entry) =
   }
 }), { threshold: 0.12 });
 document.querySelectorAll('.reveal').forEach((element) => observer.observe(element));
+
+const navPillContainer = document.querySelector('.nav-links');
+if (navPillContainer) {
+  const navPillLinks = [...navPillContainer.querySelectorAll('a[href^="#"]')];
+  if (navPillLinks[0]) navPillLinks[0].classList.add('nav-active');
+  const navSections = navPillLinks
+    .map((link) => document.querySelector(link.getAttribute('href')))
+    .filter(Boolean);
+  if (navSections.length) {
+    const navObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        const activeLink = navPillLinks.find((link) => link.getAttribute('href') === `#${entry.target.id}`);
+        if (!activeLink) return;
+        navPillLinks.forEach((link) => link.classList.toggle('nav-active', link === activeLink));
+      });
+    }, { threshold: 0.3 });
+    navSections.forEach((section) => navObserver.observe(section));
+  }
+}
+
 const year = document.querySelector('#year');
 if (year) year.textContent = new Date().getFullYear();
 

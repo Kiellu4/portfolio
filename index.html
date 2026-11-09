@@ -25,91 +25,47 @@
   </a>
   <header class="site-header">
    <nav aria-label="Primary navigation" class="nav container">
-    <a aria-label="Kiel home" class="brand" href="#whoami">
-     KIEL
-     <span>
-      _
-     </span>
-    </a>
-    <button aria-controls="nav-links" aria-expanded="false" class="menu-button" type="button">
-     <span class="sr-only">
-      Toggle navigation
-     </span>
-     <span>
-     </span>
-     <span>
-     </span>
-     <span>
-     </span>
-    </button>
     <div class="nav-links" id="nav-links">
-     <a href="#whoami">
-      I
-      <span>
-       Whoami
-      </span>
-     </a>
-     <a href="#about">
-      II
-      <span>
-       About
-      </span>
-     </a>
-     <a href="#experience">
-      III
-      <span>
-       Experience
-      </span>
-     </a>
-     <a href="#projects">
-      IV
-      <span>
-       Projects
-      </span>
-     </a>
-     <a href="#achievements">
-      V
-      <span>
-       Achievements
-      </span>
-     </a>
-     <a href="#writeups">
-      VI
-      <span>
-       Write-ups
-      </span>
-     </a>
-     <a href="#certifications">
-      VII
-      <span>
-       Licenses
-      </span>
-     </a>
-     <a href="#contact">
-      VIII
-      <span>
-       Contact
-      </span>
-     </a>
-     <button aria-label="Switch to light theme" class="theme-toggle" type="button">
-      ☼
+     <div class="nav-left">
+      <a aria-label="Kiel home" class="brand" href="#whoami">K</a>
+      <a href="#whoami">I <span>Whoami</span></a>
+     </div>
+     <button aria-controls="nav-links" aria-expanded="false" class="menu-button" type="button">
+      <span class="sr-only">Toggle navigation</span>
+      <span></span><span></span><span></span>
      </button>
+     <div class="nav-centre">
+      <a href="#about">II <span>About</span></a>
+      <a href="#experience">III <span>Experience</span></a>
+      <a href="#projects">IV <span>Projects</span></a>
+      <a href="#achievements">V <span>Achievements</span></a>
+      <a href="#writeups">VI <span>Write-ups</span></a>
+      <a href="#certifications">VII <span>Licenses</span></a>
+     </div>
+     <div class="nav-status">
+      <span class="status-working"><span aria-hidden="true" class="status-dot"></span>working</span>
+      <a aria-label="GitHub profile" class="status-icon" href="https://github.com/Kiellu4" rel="noopener" target="_blank"><svg aria-hidden="true" fill="none" height="16" viewBox="0 0 24 24" width="16"><path d="M12 2C6.48 2 2 6.58 2 12.23c0 4.52 2.87 8.35 6.84 9.7.5.1.68-.22.68-.49 0-.24-.01-1.04-.01-1.89-2.78.62-3.37-1.2-3.37-1.2-.45-1.19-1.11-1.5-1.11-1.5-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.9 1.57 2.35 1.12 2.92.85.09-.67.35-1.12.64-1.38-2.22-.26-4.56-1.14-4.56-5.07 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.31.1-2.73 0 0 .84-.28 2.75 1.05A9.23 9.23 0 0 1 12 6.9c.85 0 1.7.12 2.5.35 1.91-1.33 2.75-1.05 2.75-1.05.55 1.42.2 2.47.1 2.73.64.72 1.03 1.63 1.03 2.75 0 3.94-2.35 4.8-4.58 5.06.36.32.68.92.68 1.85 0 1.34-.01 2.42-.01 2.75 0 .27.18.6.69.49A10.25 10.25 0 0 0 22 12.23C22 6.58 17.52 2 12 2Z" fill="currentColor"/></svg></a>
+      <a aria-label="Email Muhammad Ezekiel Mukhriz" class="status-icon" href="mailto:mukhrizfitry@gmail.com"><svg aria-hidden="true" fill="none" height="16" viewBox="0 0 24 24" width="16"><rect height="15" rx="2" stroke="currentColor" stroke-width="1.7" width="18" x="3" y="4.5"/><path d="m4.5 6 7.5 5.8L19.5 6" stroke="currentColor" stroke-width="1.7"/></svg></a>
+      <div aria-label="Local time" class="nav-clock"><span>--:--:--</span><small>--/--/--</small></div>
+     </div>
+     <div class="nav-right">
+      <a href="#contact">VIII <span>Contact</span></a>
+      <button aria-label="Switch to light theme" class="theme-toggle" type="button">☼</button>
+     </div>
     </div>
    </nav>
   </header>
   <main id="main-content">
    <section class="terminal-hero container" id="whoami">
-    <p class="command-line">
-     ~&gt; whoami
-    </p>
-    <pre aria-hidden="true" class="ascii-kiel"> _  __ ___  _____ _
-| |/ /|_ _|| ____| |
-| ' /  | | |  _| | |
-| . \  | | | |___| |
-|_|\_\|___||_____|_|</pre>
-    <h1>
-     Muhammad Ezekiel Mukhriz
-    </h1>
+    <div class="whoami-copy">
+     <p class="command-line">~&gt; <span id="typed-command"></span><span aria-hidden="true" class="command-cursor">▋</span></p>
+     <pre class="ascii-kiel" aria-hidden="true">██╗  ██╗██╗███████╗██╗     
+██║ ██╔╝██║██╔════╝██║     
+█████╔╝ ██║█████╗  ██║     
+██╔═██╗ ██║██╔══╝  ██║     
+██║  ██╗██║███████╗███████╗
+╚═╝  ╚═╝╚═╝╚══════╝╚══════╝</pre>
+     <p class="hero-name">EZEKIEL MUKHRIZ</p>
     <dl class="terminal-facts">
      <div>
       <dt>
@@ -152,16 +108,33 @@
       </dd>
      </div>
     </dl>
-    <div class="actions">
+     <div class="actions">
      <a class="button primary" href="#projects">
       View Projects
      </a>
      <a class="button secondary" href="#writeups">
       CTF write-ups
      </a>
-     <a class="text-link" download="" href="assets/resume.pdf">
-      Download R&eacute;sum&eacute; &nearrow;
-     </a>
+     </div>
+    </div>
+    <div class="card-column">
+     <div aria-label="Business card — hover or focus to flip" class="card-scene" tabindex="0">
+      <div class="card-inner">
+      <article class="card-front">
+       <p class="card-mark">K_</p>
+<img src="data:image/png;base64,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" alt="QR code linking to contact information" class="card-qr">
+       <div><h2>EZEKIEL MUKHRIZ</h2><p>System Engineer</p><p>MyOne Corporation</p></div>
+       <span aria-hidden="true" class="card-lines"><i></i><i></i><i></i></span>
+      </article>
+      <article class="card-back">
+       <p class="card-back-name">Ezekiel Mukhriz</p>
+       <div class="card-row"><span class="card-label">email</span><span class="card-value">ezekiel@myonecorp.com</span></div>
+       <div class="card-row"><span class="card-label">address</span><span class="card-value">Unit 19-3, Block C1 Dataran Prima, Jalan PJU 1/41, 47301 Petaling Jaya, Selangor</span></div>
+       <div class="card-row"><span class="card-label">linkedin</span><span class="card-value">linkedin.com/in/ezekiel-mukhriz</span></div>
+       <div class="card-row"><span class="card-label">github</span><span class="card-value">github.com/Kiellu4</span></div>
+      </article>
+      </div>
+     </div>
     </div>
    </section>
    <section class="section container" id="about">
@@ -871,4 +844,3 @@
   </script>
  </body>
 </html>
-
