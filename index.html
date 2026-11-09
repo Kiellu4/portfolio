@@ -13,11 +13,11 @@
   <title>
    Muhammad Ezekiel Mukhriz | System Engineer &amp; CTF Player
   </title>
-  <link href="favicon.svg" rel="icon" type="image/svg+xml"/>
+  <link href="./favicon.svg" rel="icon" type="image/svg+xml"/>
   <link href="https://fonts.googleapis.com" rel="preconnect"/>
   <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500;600;700&amp;display=swap" rel="stylesheet"/>
-  <link href="styles.css" rel="stylesheet"/>
+  <link href="./styles.css" rel="stylesheet"/>
  </head>
  <body>
   <a class="skip-link" href="#main-content">
@@ -25,32 +25,28 @@
   </a>
   <header class="site-header">
    <nav aria-label="Primary navigation" class="nav container">
-    <div class="nav-links" id="nav-links">
-     <div class="nav-left">
-      <a aria-label="Kiel home" class="brand" href="#whoami">K</a>
-      <a href="#whoami">I <span>Whoami</span></a>
+    <a aria-label="Kiel home" class="brand" href="#whoami">K</a>
+    <button aria-controls="nav-links" aria-expanded="false" class="menu-button" type="button">
+     <span class="sr-only">Toggle navigation</span>
+     <span></span><span></span><span></span>
+    </button>
+    <div class="nav-middle">
+     <div class="nav-links nav-main" id="nav-links">
+      <a href="#whoami">I: <span>whoami</span></a>
+      <a href="#about">II: <span>about</span></a>
+      <a href="#experience">III: <span>experience</span></a>
+      <a href="#projects">IV: <span>projects</span></a>
+      <a href="#achievements">V: <span>Achievements</span></a>
+      <a href="#writeups">VI: <span>CTF Write-ups</span></a>
+      <a href="#certifications">VII: <span>Licenses &amp; certifications</span></a>
+      <a href="#contact">VIII: <span>contact</span></a>
      </div>
-     <button aria-controls="nav-links" aria-expanded="false" class="menu-button" type="button">
-      <span class="sr-only">Toggle navigation</span>
-      <span></span><span></span><span></span>
-     </button>
-     <div class="nav-centre">
-      <a href="#about">II <span>About</span></a>
-      <a href="#experience">III <span>Experience</span></a>
-      <a href="#projects">IV <span>Projects</span></a>
-      <a href="#achievements">V <span>Achievements</span></a>
-      <a href="#writeups">VI <span>Write-ups</span></a>
-      <a href="#certifications">VII <span>Licenses</span></a>
-     </div>
-     <div class="nav-status">
+     <div class="nav-widgets">
+      <button aria-label="Switch to light theme" class="theme-toggle" type="button">☼</button>
       <span class="status-working"><span aria-hidden="true" class="status-dot"></span>working</span>
       <a aria-label="GitHub profile" class="status-icon" href="https://github.com/Kiellu4" rel="noopener" target="_blank"><svg aria-hidden="true" fill="none" height="16" viewBox="0 0 24 24" width="16"><path d="M12 2C6.48 2 2 6.58 2 12.23c0 4.52 2.87 8.35 6.84 9.7.5.1.68-.22.68-.49 0-.24-.01-1.04-.01-1.89-2.78.62-3.37-1.2-3.37-1.2-.45-1.19-1.11-1.5-1.11-1.5-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.9 1.57 2.35 1.12 2.92.85.09-.67.35-1.12.64-1.38-2.22-.26-4.56-1.14-4.56-5.07 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.31.1-2.73 0 0 .84-.28 2.75 1.05A9.23 9.23 0 0 1 12 6.9c.85 0 1.7.12 2.5.35 1.91-1.33 2.75-1.05 2.75-1.05.55 1.42.2 2.47.1 2.73.64.72 1.03 1.63 1.03 2.75 0 3.94-2.35 4.8-4.58 5.06.36.32.68.92.68 1.85 0 1.34-.01 2.42-.01 2.75 0 .27.18.6.69.49A10.25 10.25 0 0 0 22 12.23C22 6.58 17.52 2 12 2Z" fill="currentColor"/></svg></a>
       <a aria-label="Email Muhammad Ezekiel Mukhriz" class="status-icon" href="mailto:mukhrizfitry@gmail.com"><svg aria-hidden="true" fill="none" height="16" viewBox="0 0 24 24" width="16"><rect height="15" rx="2" stroke="currentColor" stroke-width="1.7" width="18" x="3" y="4.5"/><path d="m4.5 6 7.5 5.8L19.5 6" stroke="currentColor" stroke-width="1.7"/></svg></a>
       <div aria-label="Local time" class="nav-clock"><span>--:--:--</span><small>--/--/--</small></div>
-     </div>
-     <div class="nav-right">
-      <a href="#contact">VIII <span>Contact</span></a>
-      <button aria-label="Switch to light theme" class="theme-toggle" type="button">☼</button>
      </div>
     </div>
    </nav>
@@ -840,7 +836,7 @@
     </p>
    </div>
   </footer>
-  <script src="script.js">
+  <script src="./script.js">
   </script>
  </body>
 </html>
