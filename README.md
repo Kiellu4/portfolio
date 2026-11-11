@@ -1,15 +1,6 @@
 # Muhammad Ezekiel Mukhriz — Portfolio
 
-Static portfolio site for Muhammad Ezekiel Mukhriz (Kiel), built with semantic HTML, CSS, and vanilla JavaScript.
-
-## Local preview
-
-```bash
-cd /mnt/c/Github/Portfolio
-python3 -m http.server 8000
-```
-
-Open `http://localhost:8000`.
+Static portfolio site for me, built with HTML, CSS, and JavaScript.
 
 ## Deployment
 
